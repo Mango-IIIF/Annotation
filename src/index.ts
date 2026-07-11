@@ -1,0 +1,20 @@
+export { OSDAnnotationEditor } from './editor';
+export type {
+  AnnotationStyle,
+  AnnotationTheme,
+  CanvasSize,
+  CanonicalEditorMode,
+  EditorConfig,
+  EditorMode,
+  FreehandAnnotation,
+  LineAnnotation,
+  OSDAnnotationEditorOptions,
+  OSDLikeViewer,
+  Point,
+  PointAnnotation,
+  PolygonAnnotation,
+  RectAnnotation,
+  ShapeData,
+  ShapeGeometry,
+  ShapeType,
+} from './types';

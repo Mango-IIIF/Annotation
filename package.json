@@ -1,0 +1,43 @@
+{
+  "name": "@mago/annotation",
+  "version": "0.1.0",
+  "description": "Framework-agnostic OpenSeadragon annotation editor.",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./w3c": {
+      "import": "./dist/w3c.js",
+      "types": "./dist/w3c.d.ts"
+    }
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "npm run build:lib && npm run build:types",
+    "build:lib": "vite build",
+    "build:types": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "openseadragon": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/openseadragon": "^5.0.2",
+    "jsdom": "^27.0.1",
+    "openseadragon": "^5.0.1",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.16",
+    "vitest": "^3.0.0"
+  }
+}

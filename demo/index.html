@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@mago/annotation demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <div class="sidebar__section">
+          <h1>@mago/annotation</h1>
+          <div class="tools" aria-label="Drawing tools">
+            <button data-mode="select" class="is-active" type="button">Select</button>
+            <button data-mode="draw-rect" type="button">Rect</button>
+            <button data-mode="draw-polygon" type="button">Polygon</button>
+            <button data-mode="draw-point" type="button">Point</button>
+            <button data-mode="draw-line" type="button">Line</button>
+            <button data-mode="draw-freehand" type="button">Freehand</button>
+          </div>
+        </div>
+
+        <div class="sidebar__section">
+          <label for="layer">Layer</label>
+          <select id="layer">
+            <option value="research">Research</option>
+            <option value="transcription">Transcription</option>
+            <option value="highlights">Highlights</option>
+          </select>
+        </div>
+
+        <div class="sidebar__section">
+          <button id="delete" type="button">Delete selected</button>
+          <button id="export" type="button">Log W3C JSON</button>
+        </div>
+
+        <div class="sidebar__section">
+          <h2>Annotations</h2>
+          <ol id="list" class="annotation-list"></ol>
+        </div>
+      </aside>
+
+      <section class="stage">
+        <div id="viewer" class="viewer"></div>
+      </section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
