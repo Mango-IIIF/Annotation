@@ -63,10 +63,21 @@ For Mango migration compatibility, the shorter tool names `rectangle`, `polygon`
 
 ## Serialization
 
-The core package uses simple `ShapeData` objects. Optional W3C helpers are available from `@mango-iiif/annotation/w3c`.
+The core package uses simple `ShapeData` objects. W3C Web Annotations can be parsed and serialized with `@mango-iiif/w3c-parser`.
 
 ```ts
-import { shapeToW3C, w3cToShape } from '@mango-iiif/annotation/w3c';
+import { W3CParser } from '@mango-iiif/w3c-parser';
+
+const annotation = W3CParser.serialize({
+  id: shape.id,
+  canvasId: 'https://example.org/canvas/1',
+  text: shape.text ?? '',
+  label: shape.label,
+  layer: shape.layer,
+  shape,
+});
+
+const parsedShape = W3CParser.parseAnnotation(annotation).shape;
 ```
 
 ## Development

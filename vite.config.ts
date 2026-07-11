@@ -15,7 +15,6 @@ export default defineConfig(({ command }) => {
       lib: {
         entry: {
           index: 'src/index.ts',
-          w3c: 'src/w3c.ts',
         },
         formats: ['es'],
       },

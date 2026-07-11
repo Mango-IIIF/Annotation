@@ -1,6 +1,6 @@
 import OpenSeadragon from 'openseadragon';
+import { W3CParser } from '@mango-iiif/w3c-parser';
 import { OSDAnnotationEditor, type CanonicalEditorMode, type ShapeData } from '../src';
-import { shapeToW3C } from '../src/w3c';
 
 const tileSource = {
   type: 'image',
@@ -106,9 +106,13 @@ document.querySelector<HTMLButtonElement>('#delete')?.addEventListener('click', 
 document.querySelector<HTMLButtonElement>('#export')?.addEventListener('click', () => {
   console.log(
     annotations.map((annotation) =>
-      shapeToW3C(annotation, {
-        source: 'demo-canvas',
-        motivation: 'commenting',
+      W3CParser.serialize({
+        id: annotation.id,
+        canvasId: 'demo-canvas',
+        text: annotation.text ?? '',
+        label: annotation.label,
+        layer: annotation.layer,
+        shape: annotation,
       }),
     ),
   );
