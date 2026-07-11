@@ -1,4 +1,4 @@
-# @mango/annotation
+# @mango-iiif/annotation
 
 Framework-agnostic OpenSeadragon annotation editor for high-resolution image overlays.
 
@@ -7,13 +7,13 @@ The package is intentionally canvas-centric. It does not parse IIIF manifests or
 ## Install
 
 ```sh
-npm install @mango/annotation openseadragon
+npm install @mango-iiif/annotation openseadragon
 ```
 
 ## Use
 
 ```ts
-import { OSDAnnotationEditor, type ShapeData } from '@mango/annotation';
+import { OSDAnnotationEditor, type ShapeData } from '@mango-iiif/annotation';
 
 let annotations: ShapeData[] = [];
 
@@ -63,10 +63,10 @@ For Mango migration compatibility, the shorter tool names `rectangle`, `polygon`
 
 ## Serialization
 
-The core package uses simple `ShapeData` objects. Optional W3C helpers are available from `@mango/annotation/w3c`.
+The core package uses simple `ShapeData` objects. Optional W3C helpers are available from `@mango-iiif/annotation/w3c`.
 
 ```ts
-import { shapeToW3C, w3cToShape } from '@mango/annotation/w3c';
+import { shapeToW3C, w3cToShape } from '@mango-iiif/annotation/w3c';
 ```
 
 ## Development
