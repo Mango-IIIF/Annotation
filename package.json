@@ -1,5 +1,5 @@
 {
-  "name": "@mago/annotation",
+  "name": "@mango/annotation",
   "version": "0.1.0",
   "description": "Framework-agnostic OpenSeadragon annotation editor.",
   "license": "MIT",
@@ -7,6 +7,10 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -25,6 +29,7 @@
     "build": "npm run build:lib && npm run build:types",
     "build:lib": "vite build",
     "build:types": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

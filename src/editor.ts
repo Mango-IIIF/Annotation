@@ -60,7 +60,7 @@ type Hit =
   | { kind: 'shape'; annotation: ShapeData }
   | { kind: 'handle'; annotation: ShapeData; handle: string; vertexIndex?: number };
 
-const CLASS_NAME = 'mago-annotation-editor';
+const CLASS_NAME = 'mango-annotation-editor';
 
 export class OSDAnnotationEditor {
   private viewer: OSDLikeViewer;
