@@ -1,6 +1,6 @@
 {
   "name": "@mango-iiif/annotation",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Framework-agnostic OpenSeadragon annotation editor.",
   "license": "MIT",
   "type": "module",
