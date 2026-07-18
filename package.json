@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Mango-IIIF/Annotation.git"
+    "url": "https://github.com/Mango-IIIF/Annotation"
   },
   "type": "module",
   "files": [
