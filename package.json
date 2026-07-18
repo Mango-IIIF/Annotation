@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Framework-agnostic OpenSeadragon annotation editor.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mango-IIIF/Annotation.git"
+  },
   "type": "module",
   "files": [
     "dist"
