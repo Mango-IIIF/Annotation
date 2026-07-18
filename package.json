@@ -1,6 +1,6 @@
 {
   "name": "@mango-iiif/annotation",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Framework-agnostic OpenSeadragon annotation editor.",
   "license": "MIT",
   "type": "module",
@@ -28,9 +28,6 @@
     "prepack": "npm run build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "openseadragon": "^5.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
