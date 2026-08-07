@@ -128,6 +128,9 @@ const gestureOperation = (drag: DragState): ChangeOperation => {
   }
 };
 
+/** Escapes an id for use inside a double-quoted attribute selector, without relying on `CSS.escape`. */
+const escapeAttributeValue = (value: string): string => value.replace(/["\\]/g, '\\$&');
+
 export class OSDAnnotationEditor {
   private viewer: OSDLikeViewer;
   private canvasSize: CanvasSize;
@@ -1130,7 +1133,9 @@ export class OSDAnnotationEditor {
 
   /** Moves DOM focus to a shape, so a screen reader follows the selection. */
   private focusShape(id: string) {
-    const element = this.shapeLayer.querySelector<SVGElement>(`[data-annotation-id="${CSS.escape(id)}"]`);
+    const element = this.shapeLayer.querySelector<SVGElement>(
+      `[data-annotation-id="${escapeAttributeValue(id)}"]`,
+    );
     element?.focus?.();
   }
 
