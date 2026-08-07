@@ -303,3 +303,111 @@ export function simplifyPoints(points: Point[], tolerance: number): Point[] {
   simplified.push(points[points.length - 1]);
   return simplified;
 }
+
+/** Signed area of a polygon; the sign tells you its winding direction. */
+export function polygonArea(points: readonly Point[]): number {
+  if (points.length < 3) return 0;
+  let total = 0;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+    const a = points[j] as Point;
+    const b = points[i] as Point;
+    total += (a.x - b.x) * (a.y + b.y);
+  }
+  return Math.abs(total / 2);
+}
+
+/** Total length of an open path. */
+export function pathLength(points: readonly Point[]): number {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    total += distance(points[index - 1] as Point, points[index] as Point);
+  }
+  return total;
+}
+
+/** Distance from a point to a segment, and where along it the nearest point lies. */
+export function projectOntoSegment(
+  point: Point,
+  start: Point,
+  end: Point,
+): { distance: number; t: number; point: Point } {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) {
+    return { distance: distance(point, start), t: 0, point: start };
+  }
+  const t = clamp(((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy), 0, 1);
+  const nearest = { x: start.x + t * dx, y: start.y + t * dy };
+  return { distance: distance(point, nearest), t, point: nearest };
+}
+
+/**
+ * The segment of a path nearest a point.
+ *
+ * Used to decide where a new vertex goes when a user clicks an edge. Returns
+ * the index of the segment's *end* vertex, which is the insertion position.
+ */
+export function nearestSegment(
+  points: readonly Point[],
+  point: Point,
+  closed: boolean,
+): { index: number; distance: number; point: Point } | null {
+  if (points.length < 2) return null;
+
+  let best: { index: number; distance: number; point: Point } | null = null;
+  const last = closed ? points.length : points.length - 1;
+
+  for (let index = 0; index < last; index += 1) {
+    const start = points[index] as Point;
+    const end = points[(index + 1) % points.length] as Point;
+    const projected = projectOntoSegment(point, start, end);
+    if (!best || projected.distance < best.distance) {
+      best = { index: index + 1, distance: projected.distance, point: projected.point };
+    }
+  }
+  return best;
+}
+
+/** Inserts a vertex into a polygon or freehand path. */
+export function insertVertex<T extends ShapeData>(annotation: T, index: number, point: Point): T {
+  if (annotation.type !== 'polygon' && annotation.type !== 'freehand') return annotation;
+  const points = [...annotation.geometry.points];
+  points.splice(clamp(index, 0, points.length), 0, point);
+  return { ...annotation, geometry: { points } };
+}
+
+/**
+ * Removes a vertex, refusing to take a shape below its valid minimum.
+ *
+ * A polygon needs three points and a path needs two. Allowing the removal
+ * would leave geometry that cannot be rendered or serialized.
+ */
+export function removeVertex<T extends ShapeData>(annotation: T, index: number): T {
+  if (annotation.type !== 'polygon' && annotation.type !== 'freehand') return annotation;
+  const minimum = annotation.type === 'polygon' ? 3 : 2;
+  if (annotation.geometry.points.length <= minimum) return annotation;
+
+  const points = annotation.geometry.points.filter((_point, position) => position !== index);
+  return { ...annotation, geometry: { points } };
+}
+
+/** Applies rectangle drawing constraints: square, and drawn from the centre. */
+export function constrainDrawnRect(
+  start: Point,
+  end: Point,
+  options: { square?: boolean; fromCenter?: boolean },
+): { x: number; y: number; w: number; h: number } {
+  let dx = end.x - start.x;
+  let dy = end.y - start.y;
+
+  if (options.square) {
+    const size = Math.max(Math.abs(dx), Math.abs(dy));
+    dx = Math.sign(dx || 1) * size;
+    dy = Math.sign(dy || 1) * size;
+  }
+
+  if (options.fromCenter) {
+    return normalizeRect({ x: start.x - dx, y: start.y - dy, w: dx * 2, h: dy * 2 });
+  }
+  return normalizeRect({ x: start.x, y: start.y, w: dx, h: dy });
+}

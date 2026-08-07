@@ -164,6 +164,14 @@ export type AnnotationTheme = {
 export type ShapeConfig = {
   rect?: {
     borderRadius?: number;
+    /** Force a square. Shift also does this for one gesture. */
+    square?: boolean;
+    /** Treat the first point as the centre rather than a corner. */
+    fromCenter?: boolean;
+  };
+  polygon?: {
+    /** Discard a polygon smaller than this, in square image pixels. */
+    minArea?: number;
   };
   line?: {
     lineCap?: CanvasLineCap;
@@ -172,6 +180,8 @@ export type ShapeConfig = {
   };
   freehand?: {
     simplifyTolerance?: number;
+    /** Discard a stroke shorter than this, in image pixels. */
+    minLength?: number;
   };
 };
 

@@ -1,4 +1,13 @@
 export { OSDAnnotationEditor } from './editor';
+export {
+  constrainDrawnRect,
+  insertVertex,
+  nearestSegment,
+  pathLength,
+  polygonArea,
+  projectOntoSegment,
+  removeVertex,
+} from './geometry';
 export { AnnotationStore, DuplicateAnnotationError } from './store';
 export type {
   InteractionPolicyResolver,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { OSDAnnotationEditor } from '../src';
-import type { AnnotationChange, ShapeData } from '../src';
+import type { AnnotationChange, OSDAnnotationEditorOptions, ShapeData } from '../src';
 
 const createContainer = () => {
   const container = document.createElement('div');
@@ -27,7 +27,7 @@ const rect = (id = 'r'): ShapeData => ({
   geometry: { x: 100, y: 100, w: 200, h: 100 },
 });
 
-const createEditor = (options: Partial<Parameters<typeof OSDAnnotationEditor>[0]> = {}) => {
+const createEditor = (options: Partial<OSDAnnotationEditorOptions> = {}) => {
   const container = createContainer();
   const editor = new OSDAnnotationEditor({
     viewer: { container },
@@ -35,7 +35,7 @@ const createEditor = (options: Partial<Parameters<typeof OSDAnnotationEditor>[0]
     annotations: [rect()],
     selectedId: 'r',
     ...options,
-  } as ConstructorParameters<typeof OSDAnnotationEditor>[0]);
+  } as OSDAnnotationEditorOptions);
   return { container, editor };
 };
 

@@ -2,6 +2,12 @@ import { DEFAULT_CONFIG, DEFAULT_STYLE, OSD_EVENTS } from './defaults';
 import {
   boundsFor,
   clamp,
+  constrainDrawnRect,
+  insertVertex,
+  nearestSegment,
+  pathLength,
+  polygonArea,
+  removeVertex,
   orientedRectCorners,
   pointsFor,
   constrainPoint,
@@ -354,6 +360,67 @@ export class OSDAnnotationEditor {
     });
   }
 
+  /**
+   * Inserts a vertex into a polygon or freehand path.
+   *
+   * With no point supplied, the vertex lands on the segment nearest `near`,
+   * which is what a click on an edge means.
+   */
+  insertVertex(id: string, near: Point): boolean {
+    const annotation = this.store.get(id);
+    if (!annotation || !this.store.canEdit(id)) return false;
+    if (annotation.type !== 'polygon' && annotation.type !== 'freehand') return false;
+
+    const segment = nearestSegment(
+      annotation.geometry.points,
+      near,
+      annotation.type === 'polygon',
+    );
+    if (!segment) return false;
+
+    const next = insertVertex(annotation, segment.index, segment.point);
+    return this.store.batch('vertex', () => {
+      this.store.update(next, { operation: 'vertex' });
+      return true;
+    });
+  }
+
+  /**
+   * Removes a vertex.
+   *
+   * Refuses below three points for a polygon and two for a path, because the
+   * result could not be rendered or serialized as that shape.
+   */
+  removeVertex(id: string, index: number): boolean {
+    const annotation = this.store.get(id);
+    if (!annotation || !this.store.canEdit(id)) return false;
+
+    const next = removeVertex(annotation, index);
+    if (next === annotation) return false;
+
+    return this.store.batch('vertex', () => {
+      this.store.update(next, { operation: 'vertex' });
+      return true;
+    });
+  }
+
+  /** Commits the in-progress polygon draft, if it has enough points. */
+  commitDraft(): boolean {
+    if (this.polygonDraft.length < 3) return false;
+    this.commitPolygonDraft();
+    return true;
+  }
+
+  /** Abandons any in-progress draft or gesture. */
+  cancelDrawing(): void {
+    this.cancelDraft();
+  }
+
+  /** Points currently in the polygon draft. */
+  getDraft(): Point[] {
+    return [...this.polygonDraft];
+  }
+
   /** Whether rotation-correct projection is available for this viewer. */
   hasAccurateProjection(): boolean {
     return hasAccurateProjection(this.viewer);
@@ -603,12 +670,15 @@ export class OSDAnnotationEditor {
       this.renderUnlessSuspended();
     }) as EventListener);
 
+    // The viewport stream fires on every frame of a pan or zoom. Coalescing to
+    // one render per animation frame is the difference between rebuilding the
+    // overlay sixty times a second and once.
     for (const eventName of OSD_EVENTS) {
-      const handler = () => this.render();
+      const handler = () => this.scheduleRender();
       this.viewer.addHandler?.(eventName, handler);
       this.removeHandlers.push(() => this.viewer.removeHandler?.(eventName, handler));
     }
-    this.listen(window, 'resize', () => this.render());
+    this.listen(window, 'resize', () => this.scheduleRender());
   }
 
   private listen<K extends keyof WindowEventMap>(
@@ -1045,11 +1115,9 @@ export class OSDAnnotationEditor {
     const [start, rawEnd] = drag.points;
     const end = this.mode === 'draw-line' && shiftKey ? snapLinePoint(start, rawEnd) : rawEnd;
     if (this.mode === 'draw-rect') {
-      const rect = normalizeRect({
-        x: start.x,
-        y: start.y,
-        w: end.x - start.x,
-        h: end.y - start.y,
+      const rect = constrainDrawnRect(start, end, {
+        square: this.config.shapes.rect?.square || shiftKey,
+        fromCenter: this.config.shapes.rect?.fromCenter ?? false,
       });
       if (rect.w < this.config.minShapeSize.width || rect.h < this.config.minShapeSize.height) {
         this.render();
@@ -1081,7 +1149,8 @@ export class OSDAnnotationEditor {
         drag.points,
         this.config.shapes.freehand?.simplifyTolerance ?? 0,
       );
-      if (points.length < 2) {
+      const minimumLength = this.config.shapes.freehand?.minLength ?? 0;
+      if (points.length < 2 || (minimumLength > 0 && pathLength(points) < minimumLength)) {
         this.render();
         return;
       }
@@ -1096,6 +1165,11 @@ export class OSDAnnotationEditor {
 
   private commitPolygonDraft(points = this.polygonDraft) {
     if (points.length < 3) return;
+    const minimumArea = this.config.shapes.polygon?.minArea ?? 0;
+    if (minimumArea > 0 && polygonArea(points) < minimumArea) {
+      this.cancelDraft();
+      return;
+    }
     this.createAnnotation({
       id: this.createId(),
       type: 'polygon',

@@ -58,6 +58,23 @@ const layerStyles: Record<string, { strokeColor: string; fillColor: string }> = 
 };
 
 const editor = new OSDAnnotationEditor({
+  config: {
+    // Rotation is opt-in; the demo is where it should be visible.
+    rotation: { enabled: true },
+  },
+  // A capped label renderer, the case that drove hosts to rewrite this SVG.
+  renderer: {
+    label: () => ({ minFontSize: 11, maxFontSize: 20, placement: 'below' }),
+  },
+  // Anything on the 'locked' layer is read-only, to show interaction policy.
+  policy: (annotation) =>
+    annotation.layer === 'locked' ? { editable: false, deletable: false } : undefined,
+  onHistoryChanged: (state) => {
+    const undo = document.querySelector<HTMLButtonElement>('#undo');
+    const redo = document.querySelector<HTMLButtonElement>('#redo');
+    if (undo) undo.disabled = !state.canUndo;
+    if (redo) redo.disabled = !state.canRedo;
+  },
   viewer,
   canvasSize: { width: 1200, height: 1594 },
   annotations,
@@ -194,3 +211,43 @@ function toNeutralShape(annotation: ShapeData): NeutralShape {
       return { type: 'polygon', geometry: { points: toPolygonPoints(annotation) } };
   }
 }
+
+document.querySelector<HTMLButtonElement>('#undo')?.addEventListener('click', () => {
+  editor.undo();
+});
+
+document.querySelector<HTMLButtonElement>('#redo')?.addEventListener('click', () => {
+  editor.redo();
+});
+
+document.querySelector<HTMLButtonElement>('#rotate')?.addEventListener('click', () => {
+  const id = editor.getSelectedId();
+  if (id) editor.rotate(id, 15);
+});
+
+document.querySelector<HTMLButtonElement>('#rotate-viewport')?.addEventListener('click', () => {
+  const viewport = viewer.viewport;
+  viewport.setRotation(viewport.getRotation() + 90, true);
+});
+
+document.querySelector<HTMLButtonElement>('#flip')?.addEventListener('click', () => {
+  viewer.viewport.setFlip(!viewer.viewport.getFlip());
+});
+
+document.querySelector<HTMLButtonElement>('#stress')?.addEventListener('click', () => {
+  // A thousand shapes in one batch: one render, one undo step.
+  editor.batch(() => {
+    for (let index = 0; index < 1000; index += 1) {
+      editor.addAnnotation({
+        id: `stress-${index}-${annotations.length}`,
+        type: 'rect',
+        geometry: {
+          x: (index % 40) * 30,
+          y: Math.floor(index / 40) * 30,
+          w: 24,
+          h: 24,
+        },
+      });
+    }
+  });
+});
