@@ -326,3 +326,80 @@ describe('change events', () => {
     expect(container.querySelectorAll('[data-annotation-id]')).toHaveLength(50);
   });
 });
+
+describe('undo survives the controlled-component pattern', () => {
+  /**
+   * A host that mirrors the editor's changes into its own state and passes them
+   * back is the ordinary way to drive this package. Nothing about that should
+   * cost the user their undo stack, and for a while it silently did.
+   */
+  const withEchoingHost = () => {
+    const container = createContainer();
+    let mirror: ShapeData[] = [rect('r')];
+
+    const editor = new OSDAnnotationEditor({
+      viewer: { container },
+      canvasSize: { width: 1000, height: 800 },
+      annotations: mirror,
+      selectedId: 'r',
+      onAnnotationCreated(annotation) {
+        mirror = [...mirror, annotation];
+        editor.setAnnotations(mirror);
+      },
+      onAnnotationUpdated(annotation) {
+        mirror = mirror.map((item) => (item.id === annotation.id ? annotation : item));
+        editor.setAnnotations(mirror);
+      },
+      onAnnotationDeleted(id) {
+        mirror = mirror.filter((item) => item.id !== id);
+        editor.setAnnotations(mirror);
+      },
+    } as OSDAnnotationEditorOptions);
+
+    return { editor, mirror: () => mirror };
+  };
+
+  it('can still undo after the host echoes an update', () => {
+    const { editor } = withEchoingHost();
+
+    editor.nudge('r', { x: 5, y: 0 });
+    expect(editor.canUndo).toBe(true);
+
+    editor.undo();
+    expect(editor.getAnnotation('r')?.geometry).toMatchObject({ x: 100 });
+  });
+
+  it('accumulates history across several echoed edits', () => {
+    const { editor } = withEchoingHost();
+
+    editor.nudge('r', { x: 1, y: 0 });
+    editor.nudge('r', { x: 1, y: 0 });
+    editor.nudge('r', { x: 1, y: 0 });
+    expect(editor.getAnnotation('r')?.geometry).toMatchObject({ x: 103 });
+
+    editor.undo();
+    editor.undo();
+    expect(editor.getAnnotation('r')?.geometry).toMatchObject({ x: 101 });
+
+    editor.redo();
+    expect(editor.getAnnotation('r')?.geometry).toMatchObject({ x: 102 });
+  });
+
+  it('can still undo after the host echoes a delete', () => {
+    const { editor } = withEchoingHost();
+
+    editor.removeAnnotation('r');
+    expect(editor.getAnnotation('r')).toBeUndefined();
+
+    expect(editor.undo()).toBe(true);
+    expect(editor.getAnnotation('r')).toBeDefined();
+  });
+
+  it('still resets when the host says the document changed', () => {
+    const { editor } = withEchoingHost();
+    editor.nudge('r', { x: 5, y: 0 });
+
+    editor.setAnnotations([rect('different')], { history: 'reset' });
+    expect(editor.canUndo).toBe(false);
+  });
+});

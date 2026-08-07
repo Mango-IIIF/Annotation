@@ -87,20 +87,21 @@ const editor = new OSDAnnotationEditor({
     selectedId = id;
     renderList();
   },
+  // The editor owns the shapes. The host mirrors them for its own list and
+  // does not pass them back: feeding a change straight into setAnnotations is
+  // a round trip that achieves nothing, and it is how a host ends up wondering
+  // why undo does nothing.
   onAnnotationCreated(annotation) {
     annotations = [...annotations, annotation];
-    editor.setAnnotations(annotations);
     renderList();
   },
   onAnnotationUpdated(annotation) {
     annotations = annotations.map((item) => (item.id === annotation.id ? annotation : item));
-    editor.setAnnotations(annotations);
     renderList();
   },
   onAnnotationDeleted(id) {
     annotations = annotations.filter((item) => item.id !== id);
     selectedId = null;
-    editor.setAnnotations(annotations);
     renderList();
   },
 });
@@ -122,10 +123,12 @@ layerSelect?.addEventListener('change', () => {
   const layer = layerSelect?.value ?? 'research';
   editor.setCurrentLayer(layer);
   if (!selectedId) return;
-  annotations = annotations.map((annotation) =>
-    annotation.id === selectedId ? { ...annotation, layer } : annotation,
-  );
-  editor.setAnnotations(annotations);
+
+  // A real edit, so it goes through the mutation API and lands in history,
+  // rather than being pushed in as a wholesale replacement.
+  const current = editor.getAnnotation(selectedId);
+  if (current) editor.updateAnnotation({ ...current, layer });
+  annotations = editor.getAnnotations();
   renderList();
 });
 
@@ -217,10 +220,14 @@ function toNeutralShape(annotation: ShapeData): NeutralShape {
 
 document.querySelector<HTMLButtonElement>('#undo')?.addEventListener('click', () => {
   editor.undo();
+  annotations = editor.getAnnotations();
+  renderList();
 });
 
 document.querySelector<HTMLButtonElement>('#redo')?.addEventListener('click', () => {
   editor.redo();
+  annotations = editor.getAnnotations();
+  renderList();
 });
 
 document.querySelector<HTMLButtonElement>('#rotate')?.addEventListener('click', () => {

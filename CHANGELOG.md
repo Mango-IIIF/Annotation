@@ -47,8 +47,9 @@ render extension points, and keyboard operation.
   `onHistoryChanged` subscription.
 - **Incremental mutation**: `addAnnotation`, `updateAnnotation`,
   `removeAnnotation`, `getAnnotation`, and `batch`. Previous values are
-  returned, a duplicate id throws, and `setAnnotations` takes an explicit
-  history policy.
+  returned, a duplicate id throws, and `setAnnotations` takes an optional
+  history policy. A sync that changes nothing does nothing, so a host mirroring
+  the editor's changes and passing them back keeps its undo stack.
 - **Interaction policy.** A host marks any shape selectable, editable,
   deletable, rotatable, or visible. Read-only shapes stay selectable.
 - **Render extension points.** Host control over shape classes and data
@@ -117,7 +118,14 @@ as drawn — for rendering, hit testing, or serializing to a selector — should
 Annotation model carries an angle, so a rotated shape serializes as the polygon
 of its outline; the demo shows the two-line bridge.
 
-`setAnnotations` now resets history by default, described above.
+`setAnnotations` preserves history by default and is a no-op when the collection
+it is given matches what the editor already holds. Pass `{ history: 'reset' }`
+when the underlying document has genuinely changed — a different image, a
+different page.
+
+A host does not need to pass the editor's own changes back through
+`setAnnotations` at all. The editor owns the shapes; mirror them into host state
+if a list or inspector needs them, and use `updateAnnotation` for real edits.
 
 ## 0.1.2
 

@@ -229,20 +229,50 @@ describe('setAll', () => {
     expect(store.get('b')?.geometry).toMatchObject({ x: 70 });
   });
 
-  it('resets history by default, so undo cannot reach a replaced document', () => {
+  it('preserves history by default', () => {
+    // Wiping it here is what breaks the ordinary host pattern of mirroring the
+    // editor's changes and passing them back.
     const store = new AnnotationStore({ annotations: [rect('a')] });
     store.update(moved(rect('a'), 30));
     expect(store.canUndo).toBe(true);
 
     store.setAll([rect('z')]);
+    expect(store.canUndo).toBe(true);
+  });
+
+  it('resets history when a caller says the document changed', () => {
+    const store = new AnnotationStore({ annotations: [rect('a')] });
+    store.update(moved(rect('a'), 30));
+
+    store.setAll([rect('z')], { history: 'reset' });
     expect(store.canUndo).toBe(false);
   });
 
-  it('preserves history when the caller asks for it', () => {
+  it('does nothing at all when the sync changes nothing', () => {
+    const changes: AnnotationChange[] = [];
+    const first = rect('a');
+    const store = new AnnotationStore({
+      annotations: [first],
+      onChange: (batch) => changes.push(...batch),
+    });
+
+    store.update(moved(rect('a'), 30));
+    const depthBefore = store.historyState().undoDepth;
+    changes.length = 0;
+
+    // The echo of a change the editor just made: exactly what it already holds.
+    store.setAll(store.all());
+
+    expect(changes).toHaveLength(0);
+    expect(store.historyState().undoDepth).toBe(depthBefore);
+  });
+
+  it('still honours an explicit reset even when nothing changed', () => {
     const store = new AnnotationStore({ annotations: [rect('a')] });
     store.update(moved(rect('a'), 30));
-    store.setAll([moved(rect('a'), 30)], { history: 'preserve' });
-    expect(store.canUndo).toBe(true);
+
+    store.setAll(store.all(), { history: 'reset' });
+    expect(store.canUndo).toBe(false);
   });
 
   it('records the replacement as one undoable entry when asked', () => {

@@ -306,14 +306,18 @@ export class AnnotationStore {
   /**
    * Replaces or merges the whole collection.
    *
-   * The history policy is required to be thought about rather than defaulted
-   * silently — see `HistoryPolicy`. `reset` is the safe choice when the
-   * underlying document changed, because preserved history would otherwise
-   * point at shapes that no longer exist.
+   * Two things here exist to keep undo working for a host that mirrors the
+   * editor's changes and passes them back — which is what most hosts do:
+   *
+   * A sync that changes nothing does nothing. The echo of a change the editor
+   * just made contains exactly what the store already holds, so it must not
+   * count as an edit.
+   *
+   * And history is preserved by default. See `HistoryPolicy`.
    */
   setAll(annotations: readonly ShapeData[], options: SetAnnotationsOptions = {}): void {
     const mode = options.mode ?? 'replace';
-    const historyPolicy = options.history ?? 'reset';
+    const historyPolicy = options.history ?? 'preserve';
 
     const previous = new Map(this.items.map((item) => [item.id, item]));
     const changes: AnnotationChange[] = [];
@@ -368,6 +372,13 @@ export class AnnotationStore {
 
     this.reindex();
     if (this.selected && !this.index.has(this.selected)) this.select(null);
+
+    // Nothing moved. Only an explicitly requested policy applies, so an echoed
+    // change cannot quietly discard the undo stack.
+    if (changes.length === 0) {
+      if (options.history === 'reset') this.history.clear();
+      return;
+    }
 
     if (historyPolicy === 'reset') this.history.clear();
     else if (historyPolicy === 'record' && changes.length > 0) {

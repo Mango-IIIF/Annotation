@@ -66,15 +66,21 @@ export interface HistoryOptions {
 /**
  * What `setAnnotations` should do to history.
  *
- * Left implicit, this is a source of real bugs: a host syncing external data
- * into the editor can otherwise leave undo pointing at shapes that no longer
- * exist. Every caller states its intent.
+ * `preserve` is the default. The obvious-looking alternative — wiping history
+ * whenever the collection is replaced — breaks the ordinary controlled-component
+ * pattern, where a host mirrors the editor's changes into its own state and
+ * passes them straight back. That echo would clear the undo stack on every
+ * edit, and clear it silently: nothing errors, undo simply stops working.
+ *
+ * `reset` remains right for a genuine document change — a different image, a
+ * different page — which is the deliberate, rarer action, so it is the one that
+ * has to be asked for.
  */
 export type HistoryPolicy =
+  /** Leave history alone. The default, and correct for a sync or an echo. */
+  | 'preserve'
   /** Wipe history. Correct when the underlying document changed. */
   | 'reset'
-  /** Leave history alone. Correct for a cosmetic or idempotent sync. */
-  | 'preserve'
   /** Record the replacement as one undoable entry. */
   | 'record';
 
