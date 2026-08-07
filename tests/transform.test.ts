@@ -8,7 +8,6 @@ import {
   constrainShape,
   IDENTITY,
   normalizeAngle,
-  orientedRectCorners,
   outlineContainsPoint,
   rotatePoint,
   rotateShape,
@@ -18,8 +17,6 @@ import {
   signedAngle,
   snapAngle,
   snapAngleWithCardinals,
-  toAxisAlignedRect,
-  toOrientedRect,
   toPolygonPoints,
   transformedBounds,
   transformShape,
@@ -146,33 +143,42 @@ describe('shape transforms', () => {
     });
   });
 
-  it('turns a rotated rectangle into an oriented rect, not a silent lie', () => {
+  it('records a rotation as an angle, leaving the shape a rectangle', () => {
     const rotated = rotateShape(rect, 30);
-    expect(rotated.type).toBe('oriented-rect');
-    if (rotated.type !== 'oriented-rect') return;
-
-    expect(rotated.geometry.angle).toBeCloseTo(30);
-    expect(rotated.geometry.w).toBeCloseTo(40);
-    expect(rotated.geometry.h).toBeCloseTo(20);
+    // The type is unchanged: a turned rectangle is still a rectangle, and a
+    // host that ignores `rotation` sees the geometry it always saw.
+    expect(rotated.type).toBe('rect');
+    expect(rotated.rotation).toBeCloseTo(30);
+    expect(rotated.geometry).toMatchObject({ x: 10, y: 20, w: 40, h: 20 });
     // Rotating about its own centre leaves the centre where it was.
-    closeTo(rotated.geometry.center, { x: 30, y: 30 });
+    closeTo(shapeCenter(rotated), { x: 30, y: 30 });
   });
 
-  it('compounds successive rotations rather than stacking wrappers', () => {
-    const once = rotateShape(rect, 30);
-    const twice = rotateShape(once, 30);
-    expect(twice.type).toBe('oriented-rect');
-    if (twice.type !== 'oriented-rect') return;
-    expect(twice.geometry.angle).toBeCloseTo(60);
+  it('compounds successive rotations on the angle', () => {
+    const twice = rotateShape(rotateShape(rect, 30), 30);
+    expect(twice.rotation).toBeCloseTo(60);
+    expect(twice.type).toBe('rect');
   });
 
-  it('rotates a polygon point by point', () => {
+  it('rotates a polygon the same way, without moving its points', () => {
     const rotated = rotateShape(polygon, 90);
     expect(rotated.type).toBe('polygon');
+    expect(rotated.rotation).toBeCloseTo(90);
     if (rotated.type !== 'polygon') return;
-    // A square turned about its centre occupies the same region.
-    expect(boundsOfPoints(rotated.geometry.points).w).toBeCloseTo(10);
-    expect(boundsOfPoints(rotated.geometry.points).h).toBeCloseTo(10);
+    // Stored points are untouched; the outline is where the rotation shows.
+    expect(rotated.geometry.points).toEqual(polygon.geometry.points);
+    expect(toPolygonPoints(rotated)[0]).not.toEqual(polygon.geometry.points[0]);
+  });
+
+  it('normalizes a full turn back to zero', () => {
+    expect(rotateShape(rect, 360).rotation).toBeCloseTo(0);
+  });
+
+  it('moves the shape when rotated about an outside pivot', () => {
+    const rotated = rotateShape(rect, 90, { x: 0, y: 0 });
+    expect(rotated.rotation).toBeCloseTo(90);
+    // The centre travels around the pivot as well as the shape turning.
+    closeTo(shapeCenter(rotated), { x: -30, y: 30 });
   });
 
   it('keeps relative point positions when constrained', () => {
@@ -192,13 +198,11 @@ describe('shape transforms', () => {
   it('keeps a rotated rectangle rigid against a canvas edge', () => {
     const rotated = rotateShape(rect, 45);
     const moved = translateShape(rotated, { x: -1000, y: -1000 }, { width: 200, height: 200 });
-    expect(moved.type).toBe('oriented-rect');
-    if (moved.type !== 'oriented-rect') return;
+    expect(moved.type).toBe('rect');
 
-    // Size and angle survive the constraint; only the centre moved.
-    expect(moved.geometry.w).toBeCloseTo(40);
-    expect(moved.geometry.h).toBeCloseTo(20);
-    expect(moved.geometry.angle).toBeCloseTo(45);
+    // Size and angle survive the constraint; only the position moved.
+    expect(moved.geometry).toMatchObject({ w: 40, h: 20 });
+    expect(moved.rotation).toBeCloseTo(45);
     expect(transformedBounds(moved).x).toBeCloseTo(0);
     expect(transformedBounds(moved).y).toBeCloseTo(0);
   });
@@ -228,40 +232,27 @@ describe('shape transforms', () => {
   });
 });
 
-describe('oriented rectangles', () => {
-  it('reports four corners clockwise from the top-left', () => {
-    const corners = orientedRectCorners({ center: { x: 0, y: 0 }, w: 20, h: 10, angle: 0 });
-    closeTo(corners[0]!, { x: -10, y: -5 });
-    closeTo(corners[1]!, { x: 10, y: -5 });
-    closeTo(corners[2]!, { x: 10, y: 5 });
-    closeTo(corners[3]!, { x: -10, y: 5 });
+describe('rotated shapes', () => {
+  it('reports an outline turned about the shape centre', () => {
+    const rotated = rotateShape(
+      { id: 'r', type: 'rect', geometry: { x: -10, y: -5, w: 20, h: 10 } },
+      0,
+    );
+    const outline = toPolygonPoints(rotated);
+    closeTo(outline[0]!, { x: -10, y: -5 });
+    closeTo(outline[2]!, { x: 10, y: 5 });
   });
 
-  it('swaps width and height at 90°', () => {
-    const bounds = boundsOfPoints(
-      orientedRectCorners({ center: { x: 0, y: 0 }, w: 20, h: 10, angle: 90 }),
+  it('swaps width and height at 90 degrees', () => {
+    const bounds = transformedBounds(
+      rotateShape({ id: 'r', type: 'rect', geometry: { x: -10, y: -5, w: 20, h: 10 } }, 90),
     );
     expect(bounds.w).toBeCloseTo(10);
     expect(bounds.h).toBeCloseTo(20);
   });
 
-  it('round-trips to and from an axis-aligned rectangle at right angles', () => {
-    const oriented = toOrientedRect({ x: 10, y: 20, w: 40, h: 20 });
-    expect(oriented.angle).toBe(0);
-    expect(toAxisAlignedRect(oriented)).toMatchObject({ x: 10, y: 20, w: 40, h: 20 });
-
-    const quarter = { ...oriented, angle: 90 };
-    expect(toAxisAlignedRect(quarter)).toMatchObject({ w: 20, h: 40 });
-  });
-
-  it('refuses to flatten an arbitrary angle to a bounding box', () => {
-    // Substituting the bounding box would silently enlarge the annotation.
-    expect(toAxisAlignedRect({ center: { x: 0, y: 0 }, w: 20, h: 10, angle: 33 })).toBeNull();
-  });
-
   it('projects to an outline a standards adapter can serialize', () => {
-    const rotated = rotateShape(rect, 45);
-    const outline = toPolygonPoints(rotated);
+    const outline = toPolygonPoints(rotateShape(rect, 45));
     expect(outline).toHaveLength(4);
     for (const point of outline) {
       expect(Number.isFinite(point.x)).toBe(true);
@@ -274,11 +265,26 @@ describe('oriented rectangles', () => {
       { id: 'r', type: 'rect', geometry: { x: -50, y: -10, w: 100, h: 20 } },
       45,
     );
-    // The centre is inside at any angle.
     expect(outlineContainsPoint(rotated, { x: 0, y: 0 })).toBe(true);
+
     // A bounding-box test would wrongly include this corner.
     const bounds = transformedBounds(rotated);
-    const corner = { x: bounds.x + 1, y: bounds.y + 1 };
-    expect(outlineContainsPoint(rotated, corner)).toBe(false);
+    expect(outlineContainsPoint(rotated, { x: bounds.x + 1, y: bounds.y + 1 })).toBe(false);
+  });
+
+  it('keeps the pivot still across repeated rotations of an asymmetric shape', () => {
+    // A triangle's outline bounding box moves as it turns, so a pivot derived
+    // from the outline would drift a little further on every rotation.
+    let shape: ShapeData = {
+      id: 't',
+      type: 'polygon',
+      geometry: { points: [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 10, y: 30 }] },
+    };
+    const pivot = shapeCenter(shape);
+
+    for (let turn = 0; turn < 8; turn += 1) shape = rotateShape(shape, 45);
+
+    closeTo(shapeCenter(shape), pivot);
+    expect(shape.rotation).toBeCloseTo(0);
   });
 });

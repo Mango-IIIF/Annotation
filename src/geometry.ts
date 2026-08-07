@@ -1,4 +1,4 @@
-import type { CanvasSize, OrientedRectGeometry, Point, ShapeData } from './types';
+import type { CanvasSize, Point, RectGeometry, ShapeData } from './types';
 
 export const DEGREES_TO_RADIANS = Math.PI / 180;
 
@@ -15,17 +15,21 @@ export function rotatePoint(point: Point, degrees: number, origin: Point): Point
   };
 }
 
-/** The four corners of an oriented rectangle, clockwise from its top-left. */
-export function orientedRectCorners(geometry: OrientedRectGeometry): Point[] {
-  const { center, w, h, angle } = geometry;
-  const halfW = w / 2;
-  const halfH = h / 2;
+/** A shape's rotation in degrees, zero when it carries none. */
+export function shapeRotation(shape: ShapeData): number {
+  const rotation = shape.rotation;
+  return typeof rotation === 'number' && Number.isFinite(rotation) ? rotation : 0;
+}
+
+/** Corners of an axis-aligned rectangle, clockwise from its top-left. */
+export function rectCorners(rect: RectGeometry): Point[] {
+  const normalized = normalizeRect(rect);
   return [
-    { x: center.x - halfW, y: center.y - halfH },
-    { x: center.x + halfW, y: center.y - halfH },
-    { x: center.x + halfW, y: center.y + halfH },
-    { x: center.x - halfW, y: center.y + halfH },
-  ].map((corner) => rotatePoint(corner, angle, center));
+    { x: normalized.x, y: normalized.y },
+    { x: normalized.x + normalized.w, y: normalized.y },
+    { x: normalized.x + normalized.w, y: normalized.y + normalized.h },
+    { x: normalized.x, y: normalized.y + normalized.h },
+  ];
 }
 
 export function clamp(value: number, min: number, max: number) {
@@ -55,7 +59,7 @@ export function distance(a: Point, b: Point) {
 }
 
 export function boundsFor(annotation: ShapeData) {
-  if (annotation.type === 'rect') {
+  if (annotation.type === 'rect' && shapeRotation(annotation) === 0) {
     return normalizeRect(annotation.geometry);
   }
   const points = pointsFor(annotation);
@@ -71,26 +75,61 @@ export function boundsFor(annotation: ShapeData) {
   };
 }
 
+/**
+ * The shape's points as stored, before any rotation is applied.
+ *
+ * Use this for anything that has to survive a rotation unchanged — the pivot,
+ * a resize in the shape's own frame, or writing geometry back.
+ */
+export function basePoints(annotation: ShapeData): Point[] {
+  if (annotation.type === 'rect') return rectCorners(annotation.geometry);
+  if (annotation.type === 'line') return [annotation.geometry.start, annotation.geometry.end];
+  if (annotation.type === 'point') return [annotation.geometry];
+  return annotation.geometry.points;
+}
+
+/**
+ * The shape's outline as drawn, with its rotation applied.
+ *
+ * This is what rendering, hit testing, and a standards adapter all want: where
+ * the shape actually is on the canvas.
+ */
 export function pointsFor(annotation: ShapeData): Point[] {
+  const points = basePoints(annotation);
+  const rotation = shapeRotation(annotation);
+  if (rotation === 0) return points;
+
+  const pivot = shapePivot(annotation);
+  return points.map((point) => rotatePoint(point, rotation, pivot));
+}
+
+/**
+ * The point a shape rotates about: the centre of its unrotated bounds.
+ *
+ * Deliberately computed from the stored geometry rather than from the drawn
+ * outline. Rotating a shape that is not symmetrical moves the bounding box of
+ * its outline, so a pivot derived from that would drift a little further on
+ * every rotation instead of staying put.
+ */
+export function shapePivot(annotation: ShapeData): Point {
+  if (annotation.type === 'point') return { ...annotation.geometry };
   if (annotation.type === 'rect') {
     const rect = normalizeRect(annotation.geometry);
-    return [
-      { x: rect.x, y: rect.y },
-      { x: rect.x + rect.w, y: rect.y },
-      { x: rect.x + rect.w, y: rect.y + rect.h },
-      { x: rect.x, y: rect.y + rect.h },
-    ];
+    return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
   }
-  if (annotation.type === 'line') {
-    return [annotation.geometry.start, annotation.geometry.end];
+
+  const points = basePoints(annotation);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
   }
-  if (annotation.type === 'point') {
-    return [annotation.geometry];
-  }
-  if (annotation.type === 'oriented-rect') {
-    return orientedRectCorners(annotation.geometry);
-  }
-  return annotation.geometry.points;
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
 }
 
 export function translateAnnotation<T extends ShapeData>(
@@ -116,18 +155,6 @@ export function translateAnnotation<T extends ShapeData>(
         { x: annotation.geometry.x + delta.x, y: annotation.geometry.y + delta.y },
         canvasSize,
       ),
-    };
-  }
-  if (annotation.type === 'oriented-rect') {
-    return {
-      ...annotation,
-      geometry: {
-        ...annotation.geometry,
-        center: {
-          x: annotation.geometry.center.x + delta.x,
-          y: annotation.geometry.center.y + delta.y,
-        },
-      },
     };
   }
   if (annotation.type === 'line') {
@@ -180,9 +207,6 @@ export function updateVertex<T extends ShapeData>(
           : { ...annotation.geometry, end: nextPoint },
     };
   }
-  if (annotation.type === 'oriented-rect') {
-    return annotation;
-  }
   if (annotation.type === 'polygon' || annotation.type === 'freehand') {
     return {
       ...annotation,
@@ -196,6 +220,16 @@ export function updateVertex<T extends ShapeData>(
   return annotation;
 }
 
+/**
+ * Resizes a rectangle by dragging one of its handles.
+ *
+ * When the rectangle carries a rotation, the work happens in its own frame:
+ * the pointer is rotated back by the shape's angle, the edges move as they
+ * would for an upright rectangle, and the resulting centre is rotated forward
+ * again so the opposite edge stays where the user can see it. Resizing in
+ * screen space would shear the shape, because a handle on a turned rectangle
+ * is not moving along a screen axis.
+ */
 export function resizeRect(
   annotation: Extract<ShapeData, { type: 'rect' }>,
   handle: string,
@@ -204,18 +238,25 @@ export function resizeRect(
   minSize: { width: number; height: number },
   lockAspect: boolean,
 ) {
+  const rotation = shapeRotation(annotation);
   const rect = normalizeRect(annotation.geometry);
+  const pivot = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+
+  // Into the rectangle's own frame, and clamp to the canvas only when upright:
+  // a rotated rectangle's local axes do not line up with the canvas edges, so
+  // clamping there would distort it.
+  const local = rotation === 0 ? constrainPoint(point, canvasSize) : rotatePoint(point, -rotation, pivot);
+
   let left = rect.x;
   let top = rect.y;
   let right = rect.x + rect.w;
   let bottom = rect.y + rect.h;
   const aspect = rect.w / Math.max(1, rect.h);
-  const next = constrainPoint(point, canvasSize);
 
-  if (handle.includes('w')) left = Math.min(next.x, right - minSize.width);
-  if (handle.includes('e')) right = Math.max(next.x, left + minSize.width);
-  if (handle.includes('n')) top = Math.min(next.y, bottom - minSize.height);
-  if (handle.includes('s')) bottom = Math.max(next.y, top + minSize.height);
+  if (handle.includes('w')) left = Math.min(local.x, right - minSize.width);
+  if (handle.includes('e')) right = Math.max(local.x, left + minSize.width);
+  if (handle.includes('n')) top = Math.min(local.y, bottom - minSize.height);
+  if (handle.includes('s')) bottom = Math.max(local.y, top + minSize.height);
 
   if (lockAspect && handle.length === 2) {
     const width = right - left;
@@ -231,19 +272,32 @@ export function resizeRect(
     }
   }
 
-  left = clamp(left, 0, canvasSize.width);
-  right = clamp(right, 0, canvasSize.width);
-  top = clamp(top, 0, canvasSize.height);
-  bottom = clamp(bottom, 0, canvasSize.height);
+  if (rotation === 0) {
+    left = clamp(left, 0, canvasSize.width);
+    right = clamp(right, 0, canvasSize.width);
+    top = clamp(top, 0, canvasSize.height);
+    bottom = clamp(bottom, 0, canvasSize.height);
+    return {
+      ...annotation,
+      geometry: normalizeRect({ x: left, y: top, w: right - left, h: bottom - top }),
+    };
+  }
+
+  const width = Math.max(minSize.width, right - left);
+  const height = Math.max(minSize.height, bottom - top);
+  // The new centre in the local frame, carried back into world space so the
+  // anchored edge does not appear to move.
+  const localCentre = { x: left + width / 2, y: top + height / 2 };
+  const worldCentre = rotatePoint(localCentre, rotation, pivot);
 
   return {
     ...annotation,
-    geometry: normalizeRect({
-      x: left,
-      y: top,
-      w: right - left,
-      h: bottom - top,
-    }),
+    geometry: {
+      x: worldCentre.x - width / 2,
+      y: worldCentre.y - height / 2,
+      w: width,
+      h: height,
+    },
   };
 }
 
@@ -412,85 +466,30 @@ export function constrainDrawnRect(
   return normalizeRect({ x: start.x, y: start.y, w: dx, h: dy });
 }
 
-/** The eight resize handles of an oriented rectangle, in its rotated frame. */
-export function orientedRectHandles(
-  geometry: OrientedRectGeometry,
-): Array<[string, Point]> {
-  const { center, w, h, angle } = geometry;
-  const halfW = w / 2;
-  const halfH = h / 2;
-  const local: Array<[string, Point]> = [
-    ['nw', { x: center.x - halfW, y: center.y - halfH }],
-    ['n', { x: center.x, y: center.y - halfH }],
-    ['ne', { x: center.x + halfW, y: center.y - halfH }],
-    ['e', { x: center.x + halfW, y: center.y }],
-    ['se', { x: center.x + halfW, y: center.y + halfH }],
-    ['s', { x: center.x, y: center.y + halfH }],
-    ['sw', { x: center.x - halfW, y: center.y + halfH }],
-    ['w', { x: center.x - halfW, y: center.y }],
-  ];
-  return local.map(([name, point]) => [name, rotatePoint(point, angle, center)]);
-}
-
 /**
- * Resizes a rotated rectangle by dragging one of its handles.
+ * The eight resize handles of a shape, positioned on its rotated outline.
  *
- * The work happens in the rectangle's own unrotated frame: the pointer is
- * rotated back by the shape's angle, the edges move as they would for an
- * axis-aligned rectangle, and the resulting centre is rotated forward again.
- * Resizing in screen space instead would shear the shape, because the handle a
- * user grabs is not moving along a screen axis once the shape is turned.
- *
- * The opposite edge stays put, which is what dragging a handle means.
+ * Named by their direction in the shape's own frame, so `e` is the edge that
+ * grows when the shape gets wider whichever way it happens to be turned.
  */
-export function resizeOrientedRect(
-  annotation: Extract<ShapeData, { type: 'oriented-rect' }>,
-  handle: string,
-  point: Point,
-  minSize: { width: number; height: number },
-  lockAspect: boolean,
-): Extract<ShapeData, { type: 'oriented-rect' }> {
-  const { center, w, h, angle } = annotation.geometry;
+export function resizeHandlesFor(annotation: ShapeData): Array<[string, Point]> {
+  if (annotation.type !== 'rect') return [];
 
-  // Into the rectangle's own frame.
-  const local = rotatePoint(point, -angle, center);
+  const rect = normalizeRect(annotation.geometry);
+  const rotation = shapeRotation(annotation);
+  const pivot = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
 
-  let left = center.x - w / 2;
-  let right = center.x + w / 2;
-  let top = center.y - h / 2;
-  let bottom = center.y + h / 2;
-  const aspect = w / Math.max(1, h);
+  const local: Array<[string, Point]> = [
+    ['nw', { x: rect.x, y: rect.y }],
+    ['n', { x: rect.x + rect.w / 2, y: rect.y }],
+    ['ne', { x: rect.x + rect.w, y: rect.y }],
+    ['e', { x: rect.x + rect.w, y: rect.y + rect.h / 2 }],
+    ['se', { x: rect.x + rect.w, y: rect.y + rect.h }],
+    ['s', { x: rect.x + rect.w / 2, y: rect.y + rect.h }],
+    ['sw', { x: rect.x, y: rect.y + rect.h }],
+    ['w', { x: rect.x, y: rect.y + rect.h / 2 }],
+  ];
 
-  if (handle.includes('w')) left = Math.min(local.x, right - minSize.width);
-  if (handle.includes('e')) right = Math.max(local.x, left + minSize.width);
-  if (handle.includes('n')) top = Math.min(local.y, bottom - minSize.height);
-  if (handle.includes('s')) bottom = Math.max(local.y, top + minSize.height);
-
-  if (lockAspect && handle.length === 2) {
-    const width = right - left;
-    const height = bottom - top;
-    if (width / Math.max(1, height) > aspect) {
-      const adjusted = width / aspect;
-      if (handle.includes('n')) top = bottom - adjusted;
-      else bottom = top + adjusted;
-    } else {
-      const adjusted = height * aspect;
-      if (handle.includes('w')) left = right - adjusted;
-      else right = left + adjusted;
-    }
-  }
-
-  const nextWidth = Math.max(minSize.width, right - left);
-  const nextHeight = Math.max(minSize.height, bottom - top);
-  const localCenter = { x: left + nextWidth / 2, y: top + nextHeight / 2 };
-
-  return {
-    ...annotation,
-    geometry: {
-      center: rotatePoint(localCenter, angle, center),
-      w: nextWidth,
-      h: nextHeight,
-      angle,
-    },
-  };
+  if (rotation === 0) return local;
+  return local.map(([name, point]) => [name, rotatePoint(point, rotation, pivot)]);
 }

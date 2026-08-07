@@ -193,6 +193,13 @@ renderList();
  * them, and the bridge is this small.
  */
 function toNeutralShape(annotation: ShapeData): NeutralShape {
+  // A rotated shape has no selector that can express its angle, so it
+  // serializes as the polygon of its outline. `toPolygonPoints` exists exactly
+  // so a host never has to work that out from the editor's SVG.
+  if (annotation.rotation) {
+    return { type: 'polygon', geometry: { points: toPolygonPoints(annotation) } };
+  }
+
   switch (annotation.type) {
     case 'rect':
       return { type: 'rect', geometry: annotation.geometry };
@@ -204,11 +211,7 @@ function toNeutralShape(annotation: ShapeData): NeutralShape {
       return { type: 'polygon', geometry: annotation.geometry };
     case 'freehand':
       return { type: 'freehand', geometry: annotation.geometry };
-    case 'oriented-rect':
-      // No IIIF selector represents an oriented rectangle, so it serializes as
-      // a polygon of its rotated corners. `toPolygonPoints` exists precisely so
-      // a host never has to work that out from the editor's SVG.
-      return { type: 'polygon', geometry: { points: toPolygonPoints(annotation) } };
+
   }
 }
 

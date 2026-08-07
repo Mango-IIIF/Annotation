@@ -58,12 +58,12 @@ describe('rotation', () => {
 
     expect(editor.rotate('r', 45)).toBe(true);
     const rotated = editor.getAnnotation('r');
-    expect(rotated?.type).toBe('oriented-rect');
-    if (rotated?.type !== 'oriented-rect') return;
-    expect(rotated.geometry.angle).toBeCloseTo(45);
+    // The shape keeps its type; only its angle changed.
+    expect(rotated?.type).toBe('rect');
+    expect(rotated?.rotation).toBeCloseTo(45);
 
     editor.undo();
-    expect(editor.getAnnotation('r')?.type).toBe('rect');
+    expect(editor.getAnnotation('r')?.rotation ?? 0).toBe(0);
   });
 
   it('refuses to rotate a shape the host marked unrotatable', () => {
@@ -72,7 +72,7 @@ describe('rotation', () => {
       policy: () => ({ rotatable: false }),
     });
     expect(editor.rotate('r', 45)).toBe(false);
-    expect(editor.getAnnotation('r')?.type).toBe('rect');
+    expect(editor.getAnnotation('r')?.rotation ?? 0).toBe(0);
   });
 
   it('offers no rotation handle for a point', () => {
@@ -108,10 +108,7 @@ describe('keyboard', () => {
     const { editor } = createEditor({ config: { rotation: { enabled: true } } });
     window.dispatchEvent(key({ key: ']' }));
 
-    const rotated = editor.getAnnotation('r');
-    expect(rotated?.type).toBe('oriented-rect');
-    if (rotated?.type !== 'oriented-rect') return;
-    expect(rotated.geometry.angle).toBeCloseTo(15);
+    expect(editor.getAnnotation('r')?.rotation).toBeCloseTo(15);
   });
 
   it('undoes and redoes from the keyboard', () => {

@@ -8,10 +8,9 @@ import {
   pathLength,
   polygonArea,
   removeVertex,
-  orientedRectCorners,
-  orientedRectHandles,
   pointsFor,
-  resizeOrientedRect,
+  resizeHandlesFor,
+  shapeRotation,
   constrainPoint,
   distance,
   normalizeRect,
@@ -78,7 +77,7 @@ type DragState =
       kind: 'resize-rect';
       id: string;
       handle: string;
-      original: Extract<ShapeData, { type: 'rect' | 'oriented-rect' }>;
+      original: Extract<ShapeData, { type: 'rect' }>;
     }
   | {
       kind: 'vertex';
@@ -603,9 +602,7 @@ export class OSDAnnotationEditor {
 
   /** The stub's resting angle for a shape, clockwise from screen up. */
   private stubAngleFor(selected: ShapeData): number {
-    if (selected.type !== 'oriented-rect') return 0;
-    const direction = this.rotationDirection(selected);
-    return normalizeAngle(Math.atan2(direction.x, -direction.y) * (180 / Math.PI));
+    return normalizeAngle(shapeRotation(selected));
   }
 
   private isSnapModifierHeld(event: PointerEvent | KeyboardEvent): boolean {
@@ -746,8 +743,7 @@ export class OSDAnnotationEditor {
             original: structuredClone(hit.annotation),
             pivot,
             startAngle: angleOf(pivot, point),
-            originalAngle:
-              hit.annotation.type === 'oriented-rect' ? hit.annotation.geometry.angle : 0,
+            originalAngle: shapeRotation(hit.annotation),
             baseDirectionAngle: this.stubAngleFor(hit.annotation),
             appliedDelta: 0,
           };
@@ -764,7 +760,7 @@ export class OSDAnnotationEditor {
           };
           return;
         }
-        if (hit.annotation.type === 'rect' || hit.annotation.type === 'oriented-rect') {
+        if (hit.annotation.type === 'rect') {
           this.store.beginTransaction('resize');
           this.drag = {
             kind: 'resize-rect',
@@ -876,25 +872,17 @@ export class OSDAnnotationEditor {
     }
 
     if (this.drag.kind === 'resize-rect') {
-      const original = this.drag.original;
-      const resized =
-        original.type === 'oriented-rect'
-          ? resizeOrientedRect(
-              original,
-              this.drag.handle,
-              point,
-              this.config.minShapeSize,
-              event.shiftKey,
-            )
-          : resizeRect(
-              original,
-              this.drag.handle,
-              point,
-              this.canvasSize,
-              this.config.minShapeSize,
-              event.shiftKey,
-            );
-      this.replaceAnnotation(resized, 'resize');
+      this.replaceAnnotation(
+        resizeRect(
+          this.drag.original,
+          this.drag.handle,
+          point,
+          this.canvasSize,
+          this.config.minShapeSize,
+          event.shiftKey,
+        ),
+        'resize',
+      );
       return;
     }
 
@@ -1310,6 +1298,13 @@ export class OSDAnnotationEditor {
 
     if (custom) {
       element = custom;
+    } else if (annotation.type === 'rect' && shapeRotation(annotation) !== 0) {
+      // A turned rectangle is drawn as the polygon of its rotated corners; an
+      // SVG rect cannot express one without a transform attribute that would
+      // then have to be undone by everything reading the element.
+      element = createSvgElement('polygon');
+      element.setAttribute('points', context.points.map((p) => `${p.x},${p.y}`).join(' '));
+      applyShapeStyle(element, style, { active, fill: true });
     } else if (annotation.type === 'rect') {
       const rect = normalizeRect(annotation.geometry);
       const start = this.toElement({ x: rect.x, y: rect.y });
@@ -1322,10 +1317,6 @@ export class OSDAnnotationEditor {
       const radius = this.config.shapes.rect?.borderRadius ?? 0;
       element.setAttribute('rx', String(radius));
       element.setAttribute('ry', String(radius));
-      applyShapeStyle(element, style, { active, fill: true });
-    } else if (annotation.type === 'oriented-rect') {
-      element = createSvgElement('polygon');
-      element.setAttribute('points', context.points.map((p) => `${p.x},${p.y}`).join(' '));
       applyShapeStyle(element, style, { active, fill: true });
     } else if (annotation.type === 'point') {
       const glyph = this.renderer?.renderPointGlyph?.(context);
@@ -1434,12 +1425,10 @@ export class OSDAnnotationEditor {
 
     // Upright by default. A label that follows a rotated shape is unreadable at
     // most angles, so following is opt-in.
-    if (spec.orientation === 'shape' && context.annotation.type === 'oriented-rect') {
+    const shapeAngle = shapeRotation(context.annotation);
+    if (spec.orientation === 'shape' && shapeAngle !== 0) {
       const centre = { x: bounds.x + bounds.w / 2, y: anchorY };
-      element.setAttribute(
-        'transform',
-        `rotate(${context.annotation.geometry.angle} ${centre.x} ${centre.y})`,
-      );
+      element.setAttribute('transform', `rotate(${shapeAngle} ${centre.x} ${centre.y})`);
     }
 
     if (spec.className) element.setAttribute('class', spec.className);
@@ -1461,29 +1450,18 @@ export class OSDAnnotationEditor {
     const accent = (resolveStyle(selected, this.theme, this.style) as AnnotationStyle).activeColor;
 
     if (selected.type === 'rect') {
-      const rect = normalizeRect(selected.geometry);
-      const handles: Array<[string, Point]> = [
-        ['nw', { x: rect.x, y: rect.y }],
-        ['n', { x: rect.x + rect.w / 2, y: rect.y }],
-        ['ne', { x: rect.x + rect.w, y: rect.y }],
-        ['e', { x: rect.x + rect.w, y: rect.y + rect.h / 2 }],
-        ['se', { x: rect.x + rect.w, y: rect.y + rect.h }],
-        ['s', { x: rect.x + rect.w / 2, y: rect.y + rect.h }],
-        ['sw', { x: rect.x, y: rect.y + rect.h }],
-        ['w', { x: rect.x, y: rect.y + rect.h / 2 }],
-      ];
-      for (const [handle, point] of handles) {
-        this.renderHandle(point, handle, selected.id, size, undefined, accent);
-      }
-      this.renderRotationHandle(selected, accent);
-      return;
-    }
-
-    if (selected.type === 'oriented-rect') {
-      // Named edge handles, not vertices: a rotated rectangle resizes the same
-      // way an upright one does, it just does it in its own frame.
-      for (const [handle, point] of orientedRectHandles(selected.geometry)) {
-        this.renderHandle(point, handle, selected.id, size, undefined, accent, selected.geometry.angle);
+      // One path at any angle: the handles are named in the shape's own frame
+      // and positioned on its rotated outline.
+      for (const [handle, point] of resizeHandlesFor(selected)) {
+        this.renderHandle(
+          point,
+          handle,
+          selected.id,
+          size,
+          undefined,
+          accent,
+          shapeRotation(selected),
+        );
       }
       this.renderRotationHandle(selected, accent);
       return;
@@ -1571,26 +1549,12 @@ export class OSDAnnotationEditor {
       return { x: Math.sin(radians), y: -Math.cos(radians) };
     }
 
-    if (selected.type === 'oriented-rect') {
-      const corners = orientedRectCorners(selected.geometry).map((point) =>
-        this.toElement(point),
-      );
-      const topLeft = corners[0];
-      const topRight = corners[1];
-      const centre = this.toElement(shapeCenter(selected));
-      if (topLeft && topRight) {
-        const midpoint = { x: (topLeft.x + topRight.x) / 2, y: (topLeft.y + topRight.y) / 2 };
-        const dx = midpoint.x - centre.x;
-        const dy = midpoint.y - centre.y;
-        const length = Math.hypot(dx, dy);
-        if (length > 0) return { x: dx / length, y: dy / length };
-      }
-    }
-
-    // Element space already carries the viewport's rotation, so screen up is
-    // simply negative y. The previous code rotated by -viewportRotation here,
-    // which applied that correction a second time.
-    return { x: 0, y: -1 };
+    // Every shape carries its own angle now, so the stub turns with any of
+    // them and stays where the user left it — the Slides and PowerPoint
+    // behaviour. Element space already carries the viewport's rotation, so the
+    // shape's own angle is the only correction needed.
+    const radians = shapeRotation(selected) * (Math.PI / 180);
+    return { x: Math.sin(radians), y: -Math.cos(radians) };
   }
 
   /**
@@ -1763,28 +1727,8 @@ export class OSDAnnotationEditor {
         return { kind: 'handle', annotation: selected, handle: 'rotate' };
       }
     }
-    if (selected.type === 'oriented-rect') {
-      for (const [name, handlePoint] of orientedRectHandles(selected.geometry)) {
-        if (this.elementDistance(point, handlePoint) <= tolerance) {
-          return { kind: 'handle', annotation: selected, handle: name };
-        }
-      }
-      return null;
-    }
-
     if (selected.type === 'rect') {
-      const rect = normalizeRect(selected.geometry);
-      const handles: Array<[string, Point]> = [
-        ['nw', { x: rect.x, y: rect.y }],
-        ['n', { x: rect.x + rect.w / 2, y: rect.y }],
-        ['ne', { x: rect.x + rect.w, y: rect.y }],
-        ['e', { x: rect.x + rect.w, y: rect.y + rect.h / 2 }],
-        ['se', { x: rect.x + rect.w, y: rect.y + rect.h }],
-        ['s', { x: rect.x + rect.w / 2, y: rect.y + rect.h }],
-        ['sw', { x: rect.x, y: rect.y + rect.h }],
-        ['w', { x: rect.x, y: rect.y + rect.h / 2 }],
-      ];
-      for (const [name, handlePoint] of handles) {
+      for (const [name, handlePoint] of resizeHandlesFor(selected)) {
         if (this.elementDistance(point, handlePoint) <= tolerance) {
           return { kind: 'handle', annotation: selected, handle: name };
         }

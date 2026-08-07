@@ -22,6 +22,11 @@ import { toPolygonPoints, type ShapeData } from '../src';
  */
 
 const toNeutral = (shape: ShapeData): NeutralShape => {
+  // A rotated shape serializes as its outline: no selector carries an angle.
+  if (shape.rotation) {
+    return { type: 'polygon', geometry: { points: toPolygonPoints(shape) } };
+  }
+
   switch (shape.type) {
     case 'rect':
       return { type: 'rect', geometry: shape.geometry };
@@ -33,11 +38,7 @@ const toNeutral = (shape: ShapeData): NeutralShape => {
       return { type: 'polygon', geometry: shape.geometry };
     case 'freehand':
       return { type: 'freehand', geometry: shape.geometry };
-    case 'oriented-rect':
-      // No IIIF selector represents an oriented rectangle, so it serializes as
-      // a polygon of its rotated corners. `toPolygonPoints` exists precisely so
-      // a host never has to work that out from the editor's SVG.
-      return { type: 'polygon', geometry: { points: toPolygonPoints(shape) } };
+
   }
 };
 

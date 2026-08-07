@@ -36,10 +36,12 @@ render extension points, and keyboard operation.
   constrained translation, transformed bounds, and matrix composition. Angles
   are degrees, positive is clockwise on screen, rotation defaults to the shape's
   own centre.
-- **`oriented-rect`**, a new shape variant. Rotating a rectangle produces one
-  rather than overloading `x`/`y`/`w`/`h`. `toPolygonPoints` projects any shape
-  to an outline a standards adapter can serialize, and `toAxisAlignedRect`
-  refuses to flatten an arbitrary angle to a bounding box.
+- **`rotation` on every shape**, in degrees clockwise about the shape's own
+  centre. Geometry stays stored unrotated, so `x`/`y`/`w`/`h` and `points` keep
+  meaning what they always meant and a host that ignores the field sees the
+  shape as it was rather than something wrong. `toPolygonPoints` gives the
+  outline as drawn, which is what rendering, hit testing, and a standards
+  adapter all want.
 - **Undo and redo.** A gesture is one entry however many previews it emitted.
   `canUndo`, `canRedo`, `undo`, `redo`, `clearHistory`, and an
   `onHistoryChanged` subscription.
@@ -72,17 +74,14 @@ render extension points, and keyboard operation.
 - A rotated rectangle resizes like any other. Its eight handles sit on its
   rotated edges, and the resize is computed in the rectangle's own frame so the
   opposite edge stays fixed and the shape does not shear.
-- The rotation affordance is a short stub of fixed screen length ending in a
-  small circular handle. It was previously a line from the shape's centre, which
-  grew with the shape and with zoom.
-- The stub anchors to the shape's own silhouette in the direction it points, so
-  it touches the shape whatever its outline. Anchoring to the bounding box left
-  it floating in open space beside a triangle or any polygon whose highest point
-  is off to one side.
-- An oriented rectangle's stub turns with the shape. A polygon or path has no
-  angle to read, so its stub rests at screen up and follows the pointer for the
-  duration of a rotation gesture rather than jumping as the bounding box changes
-  underneath it.
+- The rotation affordance follows the Google Slides and PowerPoint convention: a
+  short stub of fixed screen length from the shape's top edge to a small
+  circular handle, which turns with the shape and stays where the user left it.
+  It was previously a line from the shape's centre, which grew with the shape
+  and with zoom.
+- The stub anchors to the shape's own silhouette rather than to its bounding
+  box, so it touches the shape whatever its outline — a triangle, or any polygon
+  whose highest point is off to one side.
 - `openseadragon` is now a declared optional peer dependency, `>=4.0.0`. Only
   5.x is exercised in CI.
 - The viewport event stream is coalesced to one render per animation frame.
@@ -98,9 +97,15 @@ and the create/update/delete callbacks behave as before. The new
 `onAnnotationChanged` callback supersedes the three older ones for any host that
 wants transactions; the old ones fire only for committed changes.
 
-Two behaviours changed shape without changing signature: a rectangle rotated
-through `rotate()` comes back as an `oriented-rect`, and `setAnnotations` now
-resets history by default. Both are described above.
+Shapes gained an optional `rotation`. A host that reads `geometry` directly and
+ignores the field is safe: geometry is stored unrotated, so it sees the shape
+before any rotation rather than something incorrect. A host that needs the shape
+as drawn — for rendering, hit testing, or serializing to a selector — should use
+`toPolygonPoints`, which applies the rotation. No selector in IIIF or the Web
+Annotation model carries an angle, so a rotated shape serializes as the polygon
+of its outline; the demo shows the two-line bridge.
+
+`setAnnotations` now resets history by default, described above.
 
 ## 0.1.2
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   constrainDrawnRect,
-  orientedRectCorners,
-  resizeOrientedRect,
+  resizeRect,
+  rectCorners,
   insertVertex,
   nearestSegment,
   pathLength,
@@ -10,7 +10,7 @@ import {
   projectOntoSegment,
   removeVertex,
 } from '../src/geometry';
-import { OSDAnnotationEditor } from '../src';
+import { OSDAnnotationEditor, outlineContainsPoint, toPolygonPoints } from '../src';
 import type { OSDAnnotationEditorOptions, ShapeData } from '../src';
 
 const square: ShapeData = {
@@ -186,64 +186,62 @@ describe('capabilities', () => {
 describe('resizing a rotated rectangle', () => {
   const rotated = (angle: number): ShapeData => ({
     id: 'o',
-    type: 'oriented-rect',
-    geometry: { center: { x: 100, y: 100 }, w: 80, h: 40, angle },
+    type: 'rect',
+    geometry: { x: 60, y: 80, w: 80, h: 40 },
+    rotation: angle,
   });
 
-  it('offers named edge handles rather than inert vertices', () => {
+  const resize = (shape: ShapeData, handle: string, point: { x: number; y: number }) =>
+    resizeRect(
+      shape as Extract<ShapeData, { type: 'rect' }>,
+      handle,
+      point,
+      { width: 1000, height: 800 },
+      { width: 8, height: 8 },
+      false,
+    );
+
+  it('offers named edge handles at any angle', () => {
     const editor = createEditor({ annotations: [rotated(30)], selectedId: 'o' });
-    const container = editor.getAnnotation('o') ? document.body : document.body;
-    const handles = [...container.querySelectorAll('[data-handle]')]
+    expect(editor.getAnnotation('o')?.rotation).toBe(30);
+
+    const handles = [...document.body.querySelectorAll('[data-handle]')]
       .map((element) => element.getAttribute('data-handle'))
       .filter((handle) => handle !== 'rotate');
-
     expect(handles).toEqual(expect.arrayContaining(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']));
   });
 
-  it('resizes in the shape own frame, keeping the angle', () => {
-    const next = resizeOrientedRect(
-      rotated(0) as Extract<ShapeData, { type: 'oriented-rect' }>,
-      'e',
-      { x: 180, y: 100 },
-      { width: 8, height: 8 },
-      false,
-    );
+  it('resizes an upright rectangle from its handle', () => {
+    const next = resize(rotated(0), 'e', { x: 180, y: 100 });
     expect(next.geometry.w).toBeCloseTo(120);
     expect(next.geometry.h).toBeCloseTo(40);
-    expect(next.geometry.angle).toBe(0);
-    // The west edge stayed put, so the centre moved half the growth.
-    expect(next.geometry.center.x).toBeCloseTo(120);
+    expect(next.rotation).toBe(0);
   });
 
   it('keeps the opposite edge fixed when rotated', () => {
-    const shape = rotated(90) as Extract<ShapeData, { type: 'oriented-rect' }>;
-    // At 90 degrees the shape's local +x points down the screen.
-    const next = resizeOrientedRect(shape, 'e', { x: 100, y: 180 }, { width: 8, height: 8 }, false);
+    // At 90 degrees the rectangle's local +x points down the screen.
+    const shape = rotated(90);
+    const next = resize(shape, 'e', { x: 100, y: 180 });
 
-    expect(next.geometry.angle).toBe(90);
+    expect(next.rotation).toBe(90);
     expect(next.geometry.w).toBeCloseTo(120);
-    // The shape grew downward, so the centre moved down, not right.
-    expect(next.geometry.center.x).toBeCloseTo(100);
-    expect(next.geometry.center.y).toBeCloseTo(120);
+
+    // The west edge, as drawn, has not moved.
+    const before = toPolygonPoints(shape);
+    const after = toPolygonPoints(next);
+    expect(after[0]!.x).toBeCloseTo(before[0]!.x, 6);
+    expect(after[0]!.y).toBeCloseTo(before[0]!.y, 6);
   });
 
   it('never shrinks below the minimum size', () => {
-    const next = resizeOrientedRect(
-      rotated(45) as Extract<ShapeData, { type: 'oriented-rect' }>,
-      'e',
-      { x: -500, y: -500 },
-      { width: 8, height: 8 },
-      false,
-    );
+    const next = resize(rotated(45), 'e', { x: -500, y: -500 });
     expect(next.geometry.w).toBeGreaterThanOrEqual(8);
     expect(next.geometry.h).toBeGreaterThanOrEqual(8);
   });
 
   it('does not shear the shape', () => {
-    const shape = rotated(37) as Extract<ShapeData, { type: 'oriented-rect' }>;
-    const next = resizeOrientedRect(shape, 'se', { x: 200, y: 200 }, { width: 8, height: 8 }, false);
-
-    const corners = orientedRectCorners(next.geometry);
+    const next = resize(rotated(37), 'se', { x: 200, y: 200 });
+    const corners = toPolygonPoints(next);
     const side = (a: number, b: number) =>
       Math.hypot(corners[a]!.x - corners[b]!.x, corners[a]!.y - corners[b]!.y);
 
@@ -252,40 +250,9 @@ describe('resizing a rotated rectangle', () => {
     expect(side(0, 1)).toBeCloseTo(side(3, 2), 6);
     expect(side(1, 2)).toBeCloseTo(side(0, 3), 6);
   });
-});
 
-describe('rotation affordance', () => {
-  it('draws a stub of constant length, not a line from the centre', () => {
-    const container = document.createElement('div');
-    document.body.append(container);
-    Object.defineProperty(container, 'getBoundingClientRect', {
-      value: () => ({ x: 0, y: 0, left: 0, top: 0, width: 1000, height: 800, toJSON: () => ({}) }),
-    });
-
-    const small: ShapeData = { id: 's', type: 'rect', geometry: { x: 10, y: 10, w: 20, h: 20 } };
-    const large: ShapeData = { id: 's', type: 'rect', geometry: { x: 10, y: 10, w: 600, h: 400 } };
-
-    const lengthFor = (shape: ShapeData) => {
-      container.replaceChildren();
-      new OSDAnnotationEditor({
-        viewer: { container },
-        canvasSize: { width: 1000, height: 800 },
-        annotations: [shape],
-        selectedId: 's',
-        config: { rotation: { enabled: true } },
-      } as OSDAnnotationEditorOptions);
-
-      const stub = [...container.querySelectorAll('line')].at(-1);
-      const x1 = Number(stub?.getAttribute('x1'));
-      const y1 = Number(stub?.getAttribute('y1'));
-      const x2 = Number(stub?.getAttribute('x2'));
-      const y2 = Number(stub?.getAttribute('y2'));
-      return Math.hypot(x2 - x1, y2 - y1);
-    };
-
-    // The stub is the same length whatever the shape's size.
-    expect(lengthFor(small)).toBeCloseTo(lengthFor(large), 6);
-    expect(lengthFor(small)).toBeCloseTo(28, 6);
+  it('reports unrotated corners for an unrotated rectangle', () => {
+    expect(rectCorners({ x: 0, y: 0, w: 10, h: 4 })[2]).toEqual({ x: 10, y: 4 });
   });
 });
 
@@ -347,7 +314,19 @@ describe('rotation stub across shape types', () => {
     expect(base.y).toBeCloseTo(100, 3);
   });
 
-  it('rests at screen up for a polygon, which has no angle of its own', () => {
+  it('turns with a rotated polygon, and stays where the user left it', () => {
+    const turned = stubFor({
+      id: 'poly-turned',
+      type: 'polygon',
+      geometry: { points: [{ x: 100, y: 100 }, { x: 300, y: 100 }, { x: 200, y: 300 }] },
+      rotation: 90,
+    });
+    // Rotated a quarter turn clockwise, the stub points right rather than up.
+    expect(turned.handle.x).toBeGreaterThan(turned.base.x);
+    expect(Math.abs(turned.handle.y - turned.base.y)).toBeLessThan(1);
+  });
+
+  it('rests at screen up for an unrotated polygon', () => {
     const skewed: ShapeData = {
       id: 'skew',
       type: 'polygon',
@@ -362,16 +341,17 @@ describe('rotation stub across shape types', () => {
     expect(handle.y).toBeCloseTo(base.y - 28, 6);
   });
 
-  it('turns with an oriented rectangle', () => {
+  it('turns with a rotated rectangle', () => {
     const upright = stubFor({
       id: 'o1',
-      type: 'oriented-rect',
-      geometry: { center: { x: 200, y: 200 }, w: 100, h: 60, angle: 0 },
+      type: 'rect',
+      geometry: { x: 150, y: 170, w: 100, h: 60 },
     });
     const turned = stubFor({
       id: 'o2',
-      type: 'oriented-rect',
-      geometry: { center: { x: 200, y: 200 }, w: 100, h: 60, angle: 90 },
+      type: 'rect',
+      geometry: { x: 150, y: 170, w: 100, h: 60 },
+      rotation: 90,
     });
 
     // Upright: the stub points up. At 90 degrees clockwise: it points right.
@@ -395,8 +375,9 @@ describe('rotation stub across shape types', () => {
       },
       {
         id: 'd',
-        type: 'oriented-rect',
-        geometry: { center: { x: 200, y: 200 }, w: 120, h: 80, angle: 37 },
+        type: 'rect',
+        geometry: { x: 140, y: 160, w: 120, h: 80 },
+        rotation: 37,
       },
     ];
 
@@ -405,5 +386,78 @@ describe('rotation stub across shape types', () => {
       const length = Math.hypot(handle.x - base.x, handle.y - base.y);
       expect(length, `stub length for ${shape.type}`).toBeCloseTo(28, 6);
     }
+  });
+});
+
+describe('rotation persists on every shape type', () => {
+  const shapes: ShapeData[] = [
+    { id: 'rect', type: 'rect', geometry: { x: 100, y: 100, w: 120, h: 60 } },
+    {
+      id: 'poly',
+      type: 'polygon',
+      geometry: { points: [{ x: 100, y: 100 }, { x: 300, y: 100 }, { x: 200, y: 300 }] },
+    },
+    {
+      id: 'free',
+      type: 'freehand',
+      geometry: { points: [{ x: 100, y: 100 }, { x: 180, y: 220 }, { x: 300, y: 160 }] },
+    },
+    { id: 'line', type: 'line', geometry: { start: { x: 100, y: 100 }, end: { x: 300, y: 200 } } },
+  ];
+
+  for (const shape of shapes) {
+    it(`remembers the angle of a ${shape.type} rather than snapping back`, () => {
+      const editor = createEditor({
+        annotations: [shape],
+        selectedId: shape.id,
+        config: { rotation: { enabled: true } },
+      });
+
+      expect(editor.rotate(shape.id, 40)).toBe(true);
+      // The angle survives, which is what stops the handle returning to the top
+      // the moment a gesture ends.
+      expect(editor.getAnnotation(shape.id)?.rotation).toBeCloseTo(40);
+      // And the type never changes underneath the host.
+      expect(editor.getAnnotation(shape.id)?.type).toBe(shape.type);
+
+      editor.rotate(shape.id, 20);
+      expect(editor.getAnnotation(shape.id)?.rotation).toBeCloseTo(60);
+
+      editor.undo();
+      expect(editor.getAnnotation(shape.id)?.rotation).toBeCloseTo(40);
+    });
+  }
+
+  it('leaves stored geometry untouched, so a host reading it sees no surprise', () => {
+    const polygon = shapes[1]!;
+    const editor = createEditor({ annotations: [polygon], selectedId: 'poly' });
+    editor.rotate('poly', 90);
+
+    expect(editor.getAnnotation('poly')?.geometry).toEqual(polygon.geometry);
+    // The rotation shows in the outline, which is what rendering and
+    // serialization both use.
+    expect(toPolygonPoints(editor.getAnnotation('poly')!)).not.toEqual(
+      (polygon.geometry as { points: unknown[] }).points,
+    );
+  });
+
+  it('hit-tests a rotated polygon against its outline', () => {
+    const editor = createEditor({
+      annotations: [
+        {
+          id: 'bar',
+          type: 'polygon',
+          geometry: {
+            points: [{ x: 100, y: 190 }, { x: 400, y: 190 }, { x: 400, y: 210 }, { x: 100, y: 210 }],
+          },
+          rotation: 90,
+        },
+      ],
+    });
+
+    const shape = editor.getAnnotation('bar')!;
+    // Turned upright, the bar now covers its own centre column, not its row.
+    expect(outlineContainsPoint(shape, { x: 250, y: 320 })).toBe(true);
+    expect(outlineContainsPoint(shape, { x: 380, y: 200 })).toBe(false);
   });
 });

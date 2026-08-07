@@ -1,5 +1,15 @@
-import { clamp, DEGREES_TO_RADIANS, normalizeRect, orientedRectCorners, pointsFor, rotatePoint } from './geometry';
-import type { CanvasSize, OrientedRectGeometry, Point, RectGeometry, ShapeData } from './types';
+import {
+  basePoints,
+  clamp,
+  DEGREES_TO_RADIANS,
+  normalizeRect,
+  pointsFor,
+  rectCorners,
+  rotatePoint,
+  shapePivot,
+  shapeRotation,
+} from './geometry';
+import type { CanvasSize, Point, RectGeometry, ShapeData } from './types';
 
 /**
  * Pure geometry transforms.
@@ -19,7 +29,7 @@ import type { CanvasSize, OrientedRectGeometry, Point, RectGeometry, ShapeData }
  *   trapezium the moment it touches an edge.
  */
 
-export { DEGREES_TO_RADIANS, orientedRectCorners, rotatePoint };
+export { DEGREES_TO_RADIANS, rectCorners, rotatePoint, shapePivot, shapeRotation };
 
 /** Normalizes any angle to the half-open range [0, 360). */
 export const normalizeAngle = (degrees: number): number => {
@@ -72,16 +82,12 @@ export const centroid = (points: readonly Point[]): Point => {
   return { x: x / points.length, y: y / points.length };
 };
 
-/** Centre of a shape's axis-aligned bounds. */
-export const shapeCenter = (shape: ShapeData): Point => {
-  if (shape.type === 'point') return { ...shape.geometry };
-  if (shape.type === 'rect') {
-    const rect = normalizeRect(shape.geometry);
-    return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
-  }
-  const bounds = boundsOfPoints(pointsFor(shape));
-  return { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 };
-};
+/**
+ * The point a shape rotates about.
+ *
+ * Its unrotated centre, so repeated rotations pivot around the same place.
+ */
+export const shapeCenter = (shape: ShapeData): Point => shapePivot(shape);
 
 export const boundsOfPoints = (points: readonly Point[]): RectGeometry => {
   if (points.length === 0) return { x: 0, y: 0, w: 0, h: 0 };
@@ -189,13 +195,11 @@ export const applyMatrix = (matrix: Matrix, point: Point): Point => ({
 /* ------------------------------------------------------------------ */
 
 /**
- * Applies a matrix to every point of a shape.
+ * Applies a matrix to a shape's stored geometry.
  *
- * A rectangle under a rotation cannot stay a rectangle, so it becomes an
- * oriented rect if the shape supports one and a polygon otherwise. That choice
- * is explicit rather than silent: `x`, `y`, `w`, `h` keep meaning what they
- * always meant, and a rotated rectangle is a different shape with a different
- * discriminant.
+ * The shape's own rotation is carried through untouched — this moves and scales
+ * the geometry underneath it. A rectangle stays a rectangle, which is why
+ * rotating one no longer changes its type.
  */
 export const transformShape = <T extends ShapeData>(shape: T, matrix: Matrix): ShapeData => {
   switch (shape.type) {
@@ -215,22 +219,15 @@ export const transformShape = <T extends ShapeData>(shape: T, matrix: Matrix): S
         ...shape,
         geometry: { points: shape.geometry.points.map((point) => applyMatrix(matrix, point)) },
       };
-    case 'oriented-rect': {
-      const centre = applyMatrix(matrix, shape.geometry.center);
-      return { ...shape, geometry: { ...shape.geometry, center: centre } };
-    }
     case 'rect': {
-      const corners = pointsFor(shape).map((point) => applyMatrix(matrix, point));
-      const bounds = boundsOfPoints(corners);
-      // Axis-aligned only if the transform did not rotate or shear it.
+      const corners = rectCorners(shape.geometry).map((point) => applyMatrix(matrix, point));
       if (isAxisAligned(corners)) {
-        return { ...shape, geometry: bounds };
+        return { ...shape, geometry: boundsOfPoints(corners) };
       }
-      return {
-        ...shape,
-        type: 'polygon',
-        geometry: { points: corners },
-      } as ShapeData;
+      // A matrix that turns or shears a rectangle cannot be expressed as one,
+      // so the geometry becomes a polygon. Rotation proper never lands here:
+      // it sets the shape's angle instead.
+      return { ...shape, type: 'polygon', geometry: { points: corners } } as ShapeData;
     }
     default:
       return shape;
@@ -246,45 +243,29 @@ const isAxisAligned = (corners: readonly Point[], tolerance = 1e-9): boolean => 
 /**
  * Rotates a shape about a pivot, defaulting to its own centre.
  *
- * A rectangle becomes an oriented rect so that the rotation is recoverable —
- * turning it straight to a polygon would lose the angle and make a subsequent
- * rotation compound rather than replace.
+ * Sets the shape's angle rather than moving its points, which is what lets the
+ * rotation be undone, re-edited, and shown by a handle that stays where the
+ * user left it. Every shape type behaves the same way; a rectangle stays a
+ * rectangle.
+ *
+ * Rotating about a pivot other than the centre also moves the shape, since the
+ * centre itself travels around that pivot.
  */
 export const rotateShape = <T extends ShapeData>(
   shape: T,
   degrees: number,
   pivot?: Point,
 ): ShapeData => {
-  const origin = pivot ?? shapeCenter(shape);
+  const rotated: ShapeData = {
+    ...shape,
+    rotation: normalizeAngle(shapeRotation(shape) + degrees),
+  };
 
-  if (shape.type === 'rect') {
-    const rect = normalizeRect(shape.geometry);
-    const centre = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
-    const rotatedCentre = rotatePoint(centre, degrees, origin);
-    return {
-      ...shape,
-      type: 'oriented-rect',
-      geometry: {
-        center: rotatedCentre,
-        w: rect.w,
-        h: rect.h,
-        angle: normalizeAngle(degrees),
-      },
-    } as ShapeData;
-  }
+  if (!pivot) return rotated;
 
-  if (shape.type === 'oriented-rect') {
-    return {
-      ...shape,
-      geometry: {
-        ...shape.geometry,
-        center: rotatePoint(shape.geometry.center, degrees, origin),
-        angle: normalizeAngle(shape.geometry.angle + degrees),
-      },
-    };
-  }
-
-  return transformShape(shape, rotationMatrix(degrees, origin));
+  const centre = shapePivot(shape);
+  const moved = rotatePoint(centre, degrees, pivot);
+  return transformShape(rotated, translationMatrix({ x: moved.x - centre.x, y: moved.y - centre.y }));
 };
 
 /** Scales a shape about a pivot, defaulting to its own centre. */
@@ -295,19 +276,6 @@ export const scaleShape = <T extends ShapeData>(
   pivot?: Point,
 ): ShapeData => {
   const origin = pivot ?? shapeCenter(shape);
-
-  if (shape.type === 'oriented-rect') {
-    return {
-      ...shape,
-      geometry: {
-        ...shape.geometry,
-        center: scalePoint(shape.geometry.center, scaleX, scaleY, origin),
-        w: Math.abs(shape.geometry.w * scaleX),
-        h: Math.abs(shape.geometry.h * scaleY),
-      },
-    };
-  }
-
   return transformShape(shape, scaleMatrix(scaleX, scaleY, origin));
 };
 
@@ -335,15 +303,11 @@ export const translateShape = <T extends ShapeData>(
 };
 
 /** Axis-aligned bounds of a shape, accounting for any rotation it carries. */
+/** Axis-aligned bounds of the shape as drawn, rotation included. */
 export const transformedBounds = (shape: ShapeData): RectGeometry => {
-  if (shape.type === 'oriented-rect') return boundsOfPoints(orientedRectCorners(shape.geometry));
-  if (shape.type === 'rect') return normalizeRect(shape.geometry);
+  if (shape.type === 'rect' && shapeRotation(shape) === 0) return normalizeRect(shape.geometry);
   return boundsOfPoints(pointsFor(shape));
 };
-
-/* ------------------------------------------------------------------ */
-/* Oriented rectangles                                                 */
-/* ------------------------------------------------------------------ */
 
 /**
  * Projects any shape to an outline suitable for an SVG polygon.
@@ -353,10 +317,7 @@ export const transformedBounds = (shape: ShapeData): RectGeometry => {
  * projection here means a host never has to read the editor's SVG to find out
  * where a shape actually is.
  */
-export const toPolygonPoints = (shape: ShapeData): Point[] => {
-  if (shape.type === 'oriented-rect') return orientedRectCorners(shape.geometry);
-  return pointsFor(shape);
-};
+export const toPolygonPoints = (shape: ShapeData): Point[] => pointsFor(shape);
 
 /** Whether a point lies inside a shape's outline. */
 export const outlineContainsPoint = (shape: ShapeData, point: Point): boolean => {
@@ -372,43 +333,6 @@ export const outlineContainsPoint = (shape: ShapeData, point: Point): boolean =>
     if (intersects) inside = !inside;
   }
   return inside;
-};
-
-/** Converts an axis-aligned rectangle to an oriented one at zero degrees. */
-export const toOrientedRect = (rect: RectGeometry): OrientedRectGeometry => {
-  const normalized = normalizeRect(rect);
-  return {
-    center: { x: normalized.x + normalized.w / 2, y: normalized.y + normalized.h / 2 },
-    w: normalized.w,
-    h: normalized.h,
-    angle: 0,
-  };
-};
-
-/**
- * Converts an oriented rectangle back to an axis-aligned one.
- *
- * Returns null when the angle is not a multiple of 90°, because there is no
- * axis-aligned rectangle describing the same region and silently substituting
- * the bounding box would enlarge the annotation.
- */
-export const toAxisAlignedRect = (
-  geometry: OrientedRectGeometry,
-  tolerance = 1e-6,
-): RectGeometry | null => {
-  const angle = normalizeAngle(geometry.angle);
-  const quarter = Math.round(angle / 90) * 90;
-  if (Math.abs(angle - quarter) > tolerance) return null;
-
-  const swapped = quarter === 90 || quarter === 270;
-  const w = swapped ? geometry.h : geometry.w;
-  const h = swapped ? geometry.w : geometry.h;
-  return {
-    x: geometry.center.x - w / 2,
-    y: geometry.center.y - h / 2,
-    w,
-    h,
-  };
 };
 
 /** Angle from `origin` to `point`, in degrees, clockwise from the positive x axis. */

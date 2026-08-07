@@ -10,7 +10,7 @@ export type CanvasSize = {
   height: number;
 };
 
-export type ShapeType = 'rect' | 'oriented-rect' | 'polygon' | 'point' | 'line' | 'freehand';
+export type ShapeType = 'rect' | 'polygon' | 'point' | 'line' | 'freehand';
 
 export type EditorMode =
   | 'none'
@@ -42,25 +42,8 @@ export interface RectGeometry {
   h: number;
 }
 
-/**
- * A rectangle with an orientation.
- *
- * A separate shape rather than an angle bolted onto `RectAnnotation`, so that
- * `x`, `y`, `w`, and `h` never become ambiguous. A host that does not
- * understand rotation can ignore this variant entirely, and one that does can
- * project it with `toPolygonPoints`.
- */
-export interface OrientedRectGeometry {
-  center: Point;
-  w: number;
-  h: number;
-  /** Clockwise degrees about `center`. */
-  angle: number;
-}
-
 export type ShapeGeometry =
   | RectGeometry
-  | OrientedRectGeometry
   | { points: Point[] }
   | { start: Point; end: Point }
   | Point;
@@ -74,17 +57,15 @@ export type RectAnnotation = {
   text?: string;
   data?: unknown;
   style?: Partial<AnnotationStyle>;
-};
-
-export type OrientedRectAnnotation = {
-  id: string;
-  type: 'oriented-rect';
-  geometry: OrientedRectGeometry;
-  layer?: string;
-  label?: string;
-  text?: string;
-  data?: unknown;
-  style?: Partial<AnnotationStyle>;
+  /**
+   * Clockwise degrees about the shape's own centre.
+   *
+   * Geometry is always stored unrotated, so `x`/`y`/`w`/`h` and `points` keep
+   * meaning exactly what they always meant. Use `toPolygonPoints` for the
+   * outline as drawn. A host that ignores this field sees the shape as it was
+   * before any rotation, which is the safe reading rather than a wrong one.
+   */
+  rotation?: number;
 };
 
 export type PolygonAnnotation = {
@@ -96,6 +77,15 @@ export type PolygonAnnotation = {
   text?: string;
   data?: unknown;
   style?: Partial<AnnotationStyle>;
+  /**
+   * Clockwise degrees about the shape's own centre.
+   *
+   * Geometry is always stored unrotated, so `x`/`y`/`w`/`h` and `points` keep
+   * meaning exactly what they always meant. Use `toPolygonPoints` for the
+   * outline as drawn. A host that ignores this field sees the shape as it was
+   * before any rotation, which is the safe reading rather than a wrong one.
+   */
+  rotation?: number;
 };
 
 export type PointAnnotation = {
@@ -107,6 +97,15 @@ export type PointAnnotation = {
   text?: string;
   data?: unknown;
   style?: Partial<AnnotationStyle>;
+  /**
+   * Clockwise degrees about the shape's own centre.
+   *
+   * Geometry is always stored unrotated, so `x`/`y`/`w`/`h` and `points` keep
+   * meaning exactly what they always meant. Use `toPolygonPoints` for the
+   * outline as drawn. A host that ignores this field sees the shape as it was
+   * before any rotation, which is the safe reading rather than a wrong one.
+   */
+  rotation?: number;
 };
 
 export type LineAnnotation = {
@@ -118,6 +117,15 @@ export type LineAnnotation = {
   text?: string;
   data?: unknown;
   style?: Partial<AnnotationStyle>;
+  /**
+   * Clockwise degrees about the shape's own centre.
+   *
+   * Geometry is always stored unrotated, so `x`/`y`/`w`/`h` and `points` keep
+   * meaning exactly what they always meant. Use `toPolygonPoints` for the
+   * outline as drawn. A host that ignores this field sees the shape as it was
+   * before any rotation, which is the safe reading rather than a wrong one.
+   */
+  rotation?: number;
 };
 
 export type FreehandAnnotation = {
@@ -129,11 +137,19 @@ export type FreehandAnnotation = {
   text?: string;
   data?: unknown;
   style?: Partial<AnnotationStyle>;
+  /**
+   * Clockwise degrees about the shape's own centre.
+   *
+   * Geometry is always stored unrotated, so `x`/`y`/`w`/`h` and `points` keep
+   * meaning exactly what they always meant. Use `toPolygonPoints` for the
+   * outline as drawn. A host that ignores this field sees the shape as it was
+   * before any rotation, which is the safe reading rather than a wrong one.
+   */
+  rotation?: number;
 };
 
 export type ShapeData =
   | RectAnnotation
-  | OrientedRectAnnotation
   | PolygonAnnotation
   | PointAnnotation
   | LineAnnotation
