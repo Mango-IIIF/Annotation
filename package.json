@@ -31,7 +31,8 @@
     "build:types": "tsc -p tsconfig.build.json",
     "prepack": "npm run build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pack:check": "npm pack --dry-run"
   },
   "devDependencies": {
     "@mango-iiif/w3c-parser": "^1.0.0",
