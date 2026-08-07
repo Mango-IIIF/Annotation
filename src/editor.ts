@@ -20,7 +20,12 @@ import {
   translateAnnotation,
   updateVertex,
 } from './geometry';
-import { hasAccurateProjection } from './coordinates';
+import {
+  hasAccurateProjection,
+  matrixToTransform,
+  projectionMatrix,
+  type ProjectionMatrix,
+} from './coordinates';
 import { modeToShape, normalizeMode } from './modes';
 import { AnnotationStore, type SetAnnotationsOptions } from './store';
 import type { AnnotationChange, ChangeOperation } from './history';
@@ -45,6 +50,7 @@ import {
   elementToPoint,
   pointToElement,
   resolveStyle,
+  svgPoints,
 } from './render';
 import type {
   AnnotationRenderer,
@@ -141,12 +147,14 @@ export class OSDAnnotationEditor {
   private svg: SVGSVGElement;
   private draftLayer: SVGGElement;
   private shapeLayer: SVGGElement;
+  private labelLayer: SVGGElement;
   private handleLayer: SVGGElement;
   private drag: DragState | null = null;
   private polygonDraft: Point[] = [];
   private lastPolygonClick: { point: Point; time: number } | null = null;
   private destroyed = false;
   private renderScheduled = false;
+  private projection: ProjectionMatrix | null = null;
   private suspendDepth = 0;
   private frameHandle: number | null = null;
   private containerPosition: string | null = null;
@@ -235,8 +243,11 @@ export class OSDAnnotationEditor {
 
     this.shapeLayer = createSvgElement('g');
     this.draftLayer = createSvgElement('g');
+    // Labels and handles stay outside the projected layers: both must keep a
+    // constant screen size, which a scaling transform would defeat.
+    this.labelLayer = createSvgElement('g');
     this.handleLayer = createSvgElement('g');
-    this.svg.append(this.shapeLayer, this.draftLayer, this.handleLayer);
+    this.svg.append(this.shapeLayer, this.draftLayer, this.labelLayer, this.handleLayer);
     this.root.append(this.svg);
     this.mount();
     this.bindEvents();
@@ -1246,26 +1257,70 @@ export class OSDAnnotationEditor {
     return pointToElement(this.viewer, point, this.canvasSize);
   }
 
+  /**
+   * Rebuilds the overlay: shape structure plus the projection.
+   *
+   * Called when the annotations themselves change. A viewport change goes
+   * through `updateProjection` alone, which is the point of drawing shapes in
+   * image coordinates.
+   */
   private render() {
     if (this.destroyed) return;
-    const rect = this.viewer.container.getBoundingClientRect();
+    this.renderShapes();
+    this.updateProjection();
+  }
+
+  /** Rebuilds the shape elements. Their coordinates are image pixels. */
+  private renderShapes() {
     this.svg.style.pointerEvents = modeToShape(this.mode) ? 'auto' : 'none';
+    this.shapeLayer.replaceChildren();
+    this.draftLayer.replaceChildren();
+
+    this.store.forEachVisible((annotation) => this.renderAnnotation(annotation));
+    if (this.drag?.kind === 'draw') this.renderDraft();
+    if (this.polygonDraft.length > 0) this.renderPolygonDraft();
+  }
+
+  /**
+   * Reprojects without rebuilding.
+   *
+   * Shapes move by one `transform` attribute however many of them there are.
+   * Only the things that must keep a constant screen size are recomputed:
+   * handles, labels, and point glyphs, of which there are a handful rather than
+   * one per vertex of every annotation on the canvas.
+   */
+  private updateProjection() {
+    if (this.destroyed) return;
+
+    const rect = this.viewer.container.getBoundingClientRect();
     this.svg.setAttribute('width', String(rect.width));
     this.svg.setAttribute('height', String(rect.height));
     this.svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
-    this.shapeLayer.replaceChildren();
-    this.draftLayer.replaceChildren();
-    this.handleLayer.replaceChildren();
 
-    for (const annotation of this.store.visible()) {
-      this.renderAnnotation(annotation);
-    }
+    const matrix = projectionMatrix(this.viewer, this.canvasSize);
+    this.projection = matrix;
+    const transform = matrixToTransform(matrix);
+    this.shapeLayer.setAttribute('transform', transform);
+    this.draftLayer.setAttribute('transform', transform);
+
+    this.rescaleConstantSizeElements(matrix);
+    this.handleLayer.replaceChildren();
     this.renderHandles();
-    if (this.drag?.kind === 'draw') {
-      this.renderDraft();
-    }
-    if (this.polygonDraft.length > 0) {
-      this.renderPolygonDraft();
+    this.renderDraftHandles();
+    this.renderLabels();
+  }
+
+  /**
+   * Keeps glyphs the same size on screen as the image scales under them.
+   *
+   * A point drawn inside the transformed layer would otherwise grow with the
+   * zoom until it swallowed the region it marks.
+   */
+  private rescaleConstantSizeElements(matrix: ProjectionMatrix) {
+    for (const element of this.shapeLayer.querySelectorAll<SVGElement>('[data-scale-invariant]')) {
+      const base = Number(element.dataset.scaleInvariant);
+      if (!Number.isFinite(base)) continue;
+      element.setAttribute('r', String(base / matrix.scale));
     }
   }
 
@@ -1303,17 +1358,15 @@ export class OSDAnnotationEditor {
       // SVG rect cannot express one without a transform attribute that would
       // then have to be undone by everything reading the element.
       element = createSvgElement('polygon');
-      element.setAttribute('points', context.points.map((p) => `${p.x},${p.y}`).join(' '));
+      element.setAttribute('points', svgPoints(pointsFor(annotation)));
       applyShapeStyle(element, style, { active, fill: true });
     } else if (annotation.type === 'rect') {
       const rect = normalizeRect(annotation.geometry);
-      const start = this.toElement({ x: rect.x, y: rect.y });
-      const end = this.toElement({ x: rect.x + rect.w, y: rect.y + rect.h });
       element = createSvgElement('rect');
-      element.setAttribute('x', String(Math.min(start.x, end.x)));
-      element.setAttribute('y', String(Math.min(start.y, end.y)));
-      element.setAttribute('width', String(Math.abs(end.x - start.x)));
-      element.setAttribute('height', String(Math.abs(end.y - start.y)));
+      element.setAttribute('x', String(rect.x));
+      element.setAttribute('y', String(rect.y));
+      element.setAttribute('width', String(rect.w));
+      element.setAttribute('height', String(rect.h));
       const radius = this.config.shapes.rect?.borderRadius ?? 0;
       element.setAttribute('rx', String(radius));
       element.setAttribute('ry', String(radius));
@@ -1323,31 +1376,30 @@ export class OSDAnnotationEditor {
       if (glyph) {
         element = glyph;
       } else {
-        const point = this.toElement(annotation.geometry);
         element = createSvgElement('circle');
-        element.setAttribute('cx', String(point.x));
-        element.setAttribute('cy', String(point.y));
-        element.setAttribute('r', '6');
+        element.setAttribute('cx', String(annotation.geometry.x));
+        element.setAttribute('cy', String(annotation.geometry.y));
+        // Marked so the projection pass can hold its screen radius steady as
+        // the image scales underneath it.
+        element.dataset.scaleInvariant = '6';
+        element.setAttribute('r', String(6 / (this.projection?.scale ?? 1)));
         applyShapeStyle(element, style, { active, fill: true });
       }
     } else if (annotation.type === 'line') {
-      const [rawStart, rawEnd] = pointsFor(annotation);
-      const start = this.toElement(rawStart ?? annotation.geometry.start);
-      const end = this.toElement(rawEnd ?? annotation.geometry.end);
+      const [start, end] = pointsFor(annotation);
       element = createSvgElement('line');
-      element.setAttribute('x1', String(start.x));
-      element.setAttribute('y1', String(start.y));
-      element.setAttribute('x2', String(end.x));
-      element.setAttribute('y2', String(end.y));
+      element.setAttribute('x1', String(start?.x ?? 0));
+      element.setAttribute('y1', String(start?.y ?? 0));
+      element.setAttribute('x2', String(end?.x ?? 0));
+      element.setAttribute('y2', String(end?.y ?? 0));
       element.setAttribute('stroke-linecap', this.config.shapes.line?.lineCap ?? 'round');
       applyShapeStyle(element, style, { active, fill: false });
     } else {
-      // pointsFor, not geometry.points: the outline as drawn carries the
-      // shape's rotation, and drawing the stored points would make a rotated
-      // polygon look exactly like an unrotated one.
-      const points = pointsFor(annotation).map((point) => this.toElement(point));
+      // pointsFor, not geometry.points: the outline carries the shape's
+      // rotation, and drawing the stored points would make a rotated polygon
+      // look exactly like an unrotated one.
       element = createSvgElement(annotation.type === 'polygon' ? 'polygon' : 'polyline');
-      element.setAttribute('points', points.map((point) => `${point.x},${point.y}`).join(' '));
+      element.setAttribute('points', svgPoints(pointsFor(annotation)));
       element.setAttribute('stroke-linecap', this.config.shapes.line?.lineCap ?? 'round');
       element.setAttribute('stroke-linejoin', this.config.shapes.line?.lineJoin ?? 'round');
       applyShapeStyle(element, style, { active, fill: annotation.type === 'polygon' });
@@ -1372,7 +1424,22 @@ export class OSDAnnotationEditor {
     }
 
     this.shapeLayer.append(element);
-    this.renderLabel(context);
+  }
+
+  /**
+   * Draws the labels, in element space.
+   *
+   * Only shapes that actually carry one are projected, so this stays cheap even
+   * though it runs on every viewport change: most annotations have no label.
+   */
+  private renderLabels() {
+    this.labelLayer.replaceChildren();
+    const hasHook = Boolean(this.renderer?.label);
+
+    this.store.forEachVisible((annotation) => {
+      if (!hasHook && !annotation.label) return;
+      this.renderLabel(this.renderContext(annotation));
+    });
   }
 
   private accessibleLabelFor(annotation: ShapeData): string {
@@ -1440,7 +1507,7 @@ export class OSDAnnotationEditor {
       for (const [key, value] of Object.entries(spec.data)) element.dataset[key] = value;
     }
 
-    this.shapeLayer.append(element);
+    this.labelLayer.append(element);
   }
 
   private renderHandles() {
@@ -1596,6 +1663,21 @@ export class OSDAnnotationEditor {
     };
   }
 
+  /**
+   * Handles for the points already placed in a polygon draft.
+   *
+   * Drawn here rather than alongside the draft outline because the handle layer
+   * is rebuilt by the projection pass, which runs after the shape pass — a
+   * handle added earlier would be cleared before anyone saw it.
+   */
+  private renderDraftHandles() {
+    if (this.polygonDraft.length === 0) return;
+    const size = Math.max(6, this.config.handleSize - 2);
+    for (const point of this.polygonDraft) {
+      this.renderHandle(point, 'draft', 'draft', size);
+    }
+  }
+
   private renderHandle(
     point: Point,
     handle: string,
@@ -1655,30 +1737,26 @@ export class OSDAnnotationEditor {
           w: end.x - start.x,
           h: end.y - start.y,
         });
-        const a = this.toElement({ x: rect.x, y: rect.y });
-        const b = this.toElement({ x: rect.x + rect.w, y: rect.y + rect.h });
         const element = createSvgElement('rect');
-        element.setAttribute('x', String(Math.min(a.x, b.x)));
-        element.setAttribute('y', String(Math.min(a.y, b.y)));
-        element.setAttribute('width', String(Math.abs(b.x - a.x)));
-        element.setAttribute('height', String(Math.abs(b.y - a.y)));
+        element.setAttribute('x', String(rect.x));
+        element.setAttribute('y', String(rect.y));
+        element.setAttribute('width', String(rect.w));
+        element.setAttribute('height', String(rect.h));
         applyShapeStyle(element, style, { fill: true });
         this.draftLayer.append(element);
       } else if (this.mode === 'draw-line') {
-        const a = this.toElement(start);
-        const b = this.toElement(end);
         const element = createSvgElement('line');
-        element.setAttribute('x1', String(a.x));
-        element.setAttribute('y1', String(a.y));
-        element.setAttribute('x2', String(b.x));
-        element.setAttribute('y2', String(b.y));
+        element.setAttribute('x1', String(start.x));
+        element.setAttribute('y1', String(start.y));
+        element.setAttribute('x2', String(end.x));
+        element.setAttribute('y2', String(end.y));
         applyShapeStyle(element, style, { fill: false });
         this.draftLayer.append(element);
       } else if (this.mode === 'draw-freehand') {
         const element = createSvgElement('polyline');
         element.setAttribute(
           'points',
-          this.drag.points.map((point) => this.toElement(point)).map((p) => `${p.x},${p.y}`).join(' '),
+          svgPoints(this.drag.points),
         );
         applyShapeStyle(element, style, { fill: false });
         this.draftLayer.append(element);
@@ -1694,13 +1772,10 @@ export class OSDAnnotationEditor {
     const element = createSvgElement('polyline');
     element.setAttribute(
       'points',
-      points.map((point) => this.toElement(point)).map((point) => `${point.x},${point.y}`).join(' '),
+      svgPoints(points),
     );
     applyShapeStyle(element, style, { fill: false });
     this.draftLayer.append(element);
-    for (const point of this.polygonDraft) {
-      this.renderHandle(point, 'draft', 'draft', Math.max(6, this.config.handleSize - 2));
-    }
   }
 
   private hitTest(point: Point): Hit | null {

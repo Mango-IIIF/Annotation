@@ -236,3 +236,66 @@ export const hasAccurateProjection = (
   if (typeof viewport?.viewerElementToImageCoordinates !== 'function') return false;
   return Boolean(options?.pointFactory) || resolvePointPrototype(viewer) !== null;
 };
+
+/**
+ * The image-to-element mapping expressed as one affine matrix.
+ *
+ * OpenSeadragon's projection is a rotation about the viewport centre, a scale,
+ * a translation, and optionally a horizontal flip. All of that composes into a
+ * single affine transform, which means an overlay can draw its shapes in image
+ * coordinates once and let one `transform` attribute carry every subsequent
+ * pan, zoom, rotation, and flip.
+ *
+ * Derived by projecting three points rather than by reading the viewport's
+ * internals, so it inherits the rotation and flip correctness of the
+ * conversions above instead of restating it — and stays right if those change.
+ * The basis is the full canvas rather than a unit square, because a one-pixel
+ * basis loses most of its precision when the image is zoomed far out.
+ */
+export interface ProjectionMatrix {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+  /** Uniform scale factor, for anything that must keep a constant screen size. */
+  scale: number;
+}
+
+export const projectionMatrix = (
+  viewer: OSDLikeViewer,
+  canvasSize: CanvasSize,
+  options?: CoordinateOptions,
+): ProjectionMatrix => {
+  const width = Math.max(1, canvasSize.width);
+  const height = Math.max(1, canvasSize.height);
+
+  const origin = imageToElement(viewer, { x: 0, y: 0 }, canvasSize, options);
+  const alongX = imageToElement(viewer, { x: width, y: 0 }, canvasSize, options);
+  const alongY = imageToElement(viewer, { x: 0, y: height }, canvasSize, options);
+
+  const a = (alongX.x - origin.x) / width;
+  const b = (alongX.y - origin.y) / width;
+  const c = (alongY.x - origin.x) / height;
+  const d = (alongY.y - origin.y) / height;
+
+  const scale = Math.hypot(a, b);
+  return {
+    a,
+    b,
+    c,
+    d,
+    e: origin.x,
+    f: origin.y,
+    // A degenerate viewport would otherwise divide by zero downstream.
+    scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
+  };
+};
+
+/** Formats a matrix for an SVG `transform` attribute. */
+export const matrixToTransform = (matrix: ProjectionMatrix, precision = 6): string => {
+  const round = (value: number) =>
+    Number.isFinite(value) ? Number(value.toFixed(precision)) : 0;
+  return `matrix(${round(matrix.a)} ${round(matrix.b)} ${round(matrix.c)} ${round(matrix.d)} ${round(matrix.e)} ${round(matrix.f)})`;
+};

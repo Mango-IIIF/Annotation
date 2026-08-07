@@ -88,6 +88,14 @@ render extension points, and keyboard operation.
   host that wants the same conversion.
 - `openseadragon` is now a declared optional peer dependency, `>=4.0.0`. Only
   5.x is exercised in CI.
+- **Shapes are drawn in image coordinates inside a single transformed group.**
+  OpenSeadragon's projection is affine, so a pan, zoom, rotation, or flip is now
+  one `transform` attribute rather than a reprojection of every point of every
+  annotation. `projectionMatrix` derives that matrix by projecting three points
+  through the same conversion the editor uses, so it inherits its rotation and
+  flip correctness rather than restating it.
+- Labels and handles stay in an untransformed layer, since both must keep a
+  constant screen size; point glyphs are counter-scaled for the same reason.
 - The viewport event stream is coalesced to one render per animation frame.
   Host mutations still render synchronously, because a host that mutates and
   then measures must not read stale geometry.

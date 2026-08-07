@@ -121,6 +121,18 @@ export class AnnotationStore {
     return this.items.filter((item) => this.policyFor(item).visible);
   }
 
+  /**
+   * Visits the visible shapes without building an array.
+   *
+   * `visible()` allocates a filtered copy, which is fine once but not on every
+   * animation frame with a large collection.
+   */
+  forEachVisible(visit: (annotation: ShapeData) => void): void {
+    for (const item of this.items) {
+      if (this.policyFor(item).visible) visit(item);
+    }
+  }
+
   get(id: string): ShapeData | undefined {
     const position = this.index.get(id);
     return position === undefined ? undefined : this.items[position];

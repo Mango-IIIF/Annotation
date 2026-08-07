@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import OpenSeadragon from 'openseadragon';
-import { elementToImage, hasAccurateProjection, imageToElement } from '../src/coordinates';
+import {
+  elementToImage,
+  hasAccurateProjection,
+  imageToElement,
+  matrixToTransform,
+  projectionMatrix,
+} from '../src/coordinates';
 import type { CanvasSize, OSDLikeViewer, Point } from '../src/types';
 
 /**
@@ -63,10 +69,10 @@ const createViewer = (
   viewport.goHome(true);
   viewport.update();
 
-  if (options.rotation) {
-    viewport.setRotation(options.rotation, true);
-    viewport.update();
-  }
+  // Always set it, including zero: a bare Viewport does not start at 0°, so
+  // skipping this for a falsy angle meant the 0° cases never tested 0°.
+  viewport.setRotation(options.rotation ?? 0, true);
+  viewport.update();
   if (options.flipped) viewport.setFlip(true);
 
   return { container, viewport } as unknown as OSDLikeViewer;
@@ -251,5 +257,76 @@ describe('degraded environments', () => {
     expect(imageToElement(viewer, { x: 137, y: 613 }, IMAGE, options)).toEqual(
       imageToElement(viewer, { x: 137, y: 613 }, IMAGE),
     );
+  });
+});
+
+describe('projection matrix', () => {
+  const apply = (matrix: ReturnType<typeof projectionMatrix>, point: Point): Point => ({
+    x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+    y: matrix.b * point.x + matrix.d * point.y + matrix.f,
+  });
+
+  for (const rotation of ANGLES) {
+    it(`reproduces the point conversion exactly at ${rotation}°`, () => {
+      const viewer = createViewer({ rotation });
+      const matrix = projectionMatrix(viewer, IMAGE);
+
+      for (const point of CORNERS) {
+        const direct = toElement(viewer, point);
+        const viaMatrix = apply(matrix, point);
+        expect(viaMatrix.x, `x at ${rotation}°`).toBeCloseTo(direct.x, 6);
+        expect(viaMatrix.y, `y at ${rotation}°`).toBeCloseTo(direct.y, 6);
+      }
+    });
+  }
+
+  it('reproduces the conversion while flipped', () => {
+    const viewer = createViewer({ flipped: true, rotation: 33 });
+    const matrix = projectionMatrix(viewer, IMAGE);
+
+    for (const point of CORNERS) {
+      const direct = toElement(viewer, point);
+      const viaMatrix = apply(matrix, point);
+      expect(viaMatrix.x).toBeCloseTo(direct.x, 6);
+      expect(viaMatrix.y).toBeCloseTo(direct.y, 6);
+    }
+  });
+
+  it('reports a scale that tracks the zoom level', () => {
+    const viewer = createViewer();
+    const viewport = viewer.viewport as OpenSeadragon.Viewport;
+    const before = projectionMatrix(viewer, IMAGE).scale;
+
+    viewport.zoomTo(viewport.getZoom(true) * 2, undefined, true);
+    viewport.update();
+
+    expect(projectionMatrix(viewer, IMAGE).scale).toBeCloseTo(before * 2, 4);
+  });
+
+  it('encodes rotation in the matrix, not just in the offsets', () => {
+    const upright = projectionMatrix(createViewer({ rotation: 0 }), IMAGE);
+    const turned = projectionMatrix(createViewer({ rotation: 90 }), IMAGE);
+
+    // At 0° the basis is axis-aligned; at 90° it is not.
+    expect(Math.abs(upright.b)).toBeLessThan(1e-9);
+    expect(Math.abs(turned.b)).toBeGreaterThan(0.1);
+  });
+
+  it('stays usable with no viewport at all', () => {
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'getBoundingClientRect', {
+      value: () => ({ left: 0, top: 0, width: 1000, height: 800, toJSON: () => ({}) }),
+    });
+    const viewer = { container } as unknown as OSDLikeViewer;
+
+    const matrix = projectionMatrix(viewer, IMAGE);
+    // The proportional fallback is affine too, so it has an honest matrix.
+    expect(matrix.scale).toBeCloseTo(1, 6);
+    expect(apply(matrix, { x: 250, y: 300 })).toEqual({ x: 250, y: 300 });
+  });
+
+  it('formats as an SVG transform', () => {
+    const matrix = projectionMatrix(createViewer(), IMAGE);
+    expect(matrixToTransform(matrix)).toMatch(/^matrix\(-?[\d.]+ -?[\d.]+ -?[\d.]+ -?[\d.]+ -?[\d.]+ -?[\d.]+\)$/);
   });
 });

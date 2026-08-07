@@ -29,7 +29,14 @@ export type {
   HistoryPolicy,
   HistoryState,
 } from './history';
-export { elementToImage, hasAccurateProjection, imageToElement } from './coordinates';
+export {
+  elementToImage,
+  hasAccurateProjection,
+  imageToElement,
+  matrixToTransform,
+  projectionMatrix,
+} from './coordinates';
+export type { ProjectionMatrix } from './coordinates';
 export {
   angleOf,
   applyMatrix,
