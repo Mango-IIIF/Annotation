@@ -1,4 +1,6 @@
 export { OSDAnnotationEditor } from './editor';
+export { elementToImage, hasAccurateProjection, imageToElement } from './coordinates';
+export type { CoordinateOptions } from './coordinates';
 export type {
   AnnotationStyle,
   AnnotationTheme,

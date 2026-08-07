@@ -1,5 +1,13 @@
 import OpenSeadragon from 'openseadragon';
-import { W3CParser } from '@mango-iiif/w3c-parser';
+import {
+  createAnnotation,
+  createAnnotationPage,
+  createTarget,
+  createTextualBody,
+  serializeAnnotationPage,
+  stringLabel,
+  type NeutralShape,
+} from '@mango-iiif/w3c-parser';
 import { OSDAnnotationEditor, type CanonicalEditorMode, type ShapeData } from '../src';
 
 const tileSource = {
@@ -104,18 +112,32 @@ document.querySelector<HTMLButtonElement>('#delete')?.addEventListener('click', 
 });
 
 document.querySelector<HTMLButtonElement>('#export')?.addEventListener('click', () => {
-  console.log(
+  // The editor emits neutral shapes. Turning them into Web Annotations is the
+  // host's job, and it is demonstrated here rather than built into the package.
+  const page = createAnnotationPage(
     annotations.map((annotation) =>
-      W3CParser.serialize({
-        id: annotation.id,
-        canvasId: 'demo-canvas',
-        text: annotation.text ?? '',
-        label: annotation.label,
-        layer: annotation.layer,
-        shape: annotation,
+      createAnnotation({
+        id: `https://example.org/annotation/${annotation.id}`,
+        motivation: 'commenting',
+        ...(annotation.text
+          ? { bodies: [createTextualBody(annotation.text, { purpose: 'commenting' })] }
+          : {}),
+        ...(annotation.label ? { label: stringLabel(annotation.label) } : {}),
+        targets: [
+          createTarget('https://example.org/canvas/demo', toNeutralShape(annotation), {
+            ...(annotation.layer ? { styleClass: annotation.layer } : {}),
+          }),
+        ],
       }),
     ),
+    { id: 'https://example.org/annotation-page/demo' },
   );
+
+  const { json, diagnostics } = serializeAnnotationPage(page, {
+    profile: 'iiif-presentation-3',
+  });
+  console.log(JSON.stringify(json, null, 2));
+  if (diagnostics.length > 0) console.warn(diagnostics);
 });
 
 function renderList() {
@@ -140,3 +162,25 @@ function renderList() {
 }
 
 renderList();
+
+/**
+ * Projects an editor shape onto the parser's neutral geometry.
+ *
+ * The two vocabularies are deliberately separate: the editor knows nothing
+ * about selectors, and the parser knows nothing about pointers. A host bridges
+ * them, and the bridge is this small.
+ */
+function toNeutralShape(annotation: ShapeData): NeutralShape {
+  switch (annotation.type) {
+    case 'rect':
+      return { type: 'rect', geometry: annotation.geometry };
+    case 'point':
+      return { type: 'point', geometry: annotation.geometry };
+    case 'line':
+      return { type: 'line', geometry: annotation.geometry };
+    case 'polygon':
+      return { type: 'polygon', geometry: annotation.geometry };
+    case 'freehand':
+      return { type: 'freehand', geometry: annotation.geometry };
+  }
+}
