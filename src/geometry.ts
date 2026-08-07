@@ -411,3 +411,86 @@ export function constrainDrawnRect(
   }
   return normalizeRect({ x: start.x, y: start.y, w: dx, h: dy });
 }
+
+/** The eight resize handles of an oriented rectangle, in its rotated frame. */
+export function orientedRectHandles(
+  geometry: OrientedRectGeometry,
+): Array<[string, Point]> {
+  const { center, w, h, angle } = geometry;
+  const halfW = w / 2;
+  const halfH = h / 2;
+  const local: Array<[string, Point]> = [
+    ['nw', { x: center.x - halfW, y: center.y - halfH }],
+    ['n', { x: center.x, y: center.y - halfH }],
+    ['ne', { x: center.x + halfW, y: center.y - halfH }],
+    ['e', { x: center.x + halfW, y: center.y }],
+    ['se', { x: center.x + halfW, y: center.y + halfH }],
+    ['s', { x: center.x, y: center.y + halfH }],
+    ['sw', { x: center.x - halfW, y: center.y + halfH }],
+    ['w', { x: center.x - halfW, y: center.y }],
+  ];
+  return local.map(([name, point]) => [name, rotatePoint(point, angle, center)]);
+}
+
+/**
+ * Resizes a rotated rectangle by dragging one of its handles.
+ *
+ * The work happens in the rectangle's own unrotated frame: the pointer is
+ * rotated back by the shape's angle, the edges move as they would for an
+ * axis-aligned rectangle, and the resulting centre is rotated forward again.
+ * Resizing in screen space instead would shear the shape, because the handle a
+ * user grabs is not moving along a screen axis once the shape is turned.
+ *
+ * The opposite edge stays put, which is what dragging a handle means.
+ */
+export function resizeOrientedRect(
+  annotation: Extract<ShapeData, { type: 'oriented-rect' }>,
+  handle: string,
+  point: Point,
+  minSize: { width: number; height: number },
+  lockAspect: boolean,
+): Extract<ShapeData, { type: 'oriented-rect' }> {
+  const { center, w, h, angle } = annotation.geometry;
+
+  // Into the rectangle's own frame.
+  const local = rotatePoint(point, -angle, center);
+
+  let left = center.x - w / 2;
+  let right = center.x + w / 2;
+  let top = center.y - h / 2;
+  let bottom = center.y + h / 2;
+  const aspect = w / Math.max(1, h);
+
+  if (handle.includes('w')) left = Math.min(local.x, right - minSize.width);
+  if (handle.includes('e')) right = Math.max(local.x, left + minSize.width);
+  if (handle.includes('n')) top = Math.min(local.y, bottom - minSize.height);
+  if (handle.includes('s')) bottom = Math.max(local.y, top + minSize.height);
+
+  if (lockAspect && handle.length === 2) {
+    const width = right - left;
+    const height = bottom - top;
+    if (width / Math.max(1, height) > aspect) {
+      const adjusted = width / aspect;
+      if (handle.includes('n')) top = bottom - adjusted;
+      else bottom = top + adjusted;
+    } else {
+      const adjusted = height * aspect;
+      if (handle.includes('w')) left = right - adjusted;
+      else right = left + adjusted;
+    }
+  }
+
+  const nextWidth = Math.max(minSize.width, right - left);
+  const nextHeight = Math.max(minSize.height, bottom - top);
+  const localCenter = { x: left + nextWidth / 2, y: top + nextHeight / 2 };
+
+  return {
+    ...annotation,
+    geometry: {
+      center: rotatePoint(localCenter, angle, center),
+      w: nextWidth,
+      h: nextHeight,
+      angle,
+    },
+  };
+}

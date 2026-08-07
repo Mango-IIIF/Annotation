@@ -69,6 +69,12 @@ render extension points, and keyboard operation.
 
 ### Changed
 
+- A rotated rectangle resizes like any other. Its eight handles sit on its
+  rotated edges, and the resize is computed in the rectangle's own frame so the
+  opposite edge stays fixed and the shape does not shear.
+- The rotation affordance is a short stub from the middle of the shape's top
+  edge to a small circular handle, turning with the shape. It was previously a
+  line from the shape's centre, which grew with the shape and with zoom.
 - `openseadragon` is now a declared optional peer dependency, `>=4.0.0`. Only
   5.x is exercised in CI.
 - The viewport event stream is coalesced to one render per animation frame.

@@ -9,7 +9,9 @@ import {
   polygonArea,
   removeVertex,
   orientedRectCorners,
+  orientedRectHandles,
   pointsFor,
+  resizeOrientedRect,
   constrainPoint,
   distance,
   normalizeRect,
@@ -76,7 +78,7 @@ type DragState =
       kind: 'resize-rect';
       id: string;
       handle: string;
-      original: Extract<ShapeData, { type: 'rect' }>;
+      original: Extract<ShapeData, { type: 'rect' | 'oriented-rect' }>;
     }
   | {
       kind: 'vertex';
@@ -748,7 +750,7 @@ export class OSDAnnotationEditor {
           };
           return;
         }
-        if (hit.annotation.type === 'rect') {
+        if (hit.annotation.type === 'rect' || hit.annotation.type === 'oriented-rect') {
           this.store.beginTransaction('resize');
           this.drag = {
             kind: 'resize-rect',
@@ -860,17 +862,25 @@ export class OSDAnnotationEditor {
     }
 
     if (this.drag.kind === 'resize-rect') {
-      this.replaceAnnotation(
-        resizeRect(
-          this.drag.original,
-          this.drag.handle,
-          point,
-          this.canvasSize,
-          this.config.minShapeSize,
-          event.shiftKey,
-        ),
-        'resize',
-      );
+      const original = this.drag.original;
+      const resized =
+        original.type === 'oriented-rect'
+          ? resizeOrientedRect(
+              original,
+              this.drag.handle,
+              point,
+              this.config.minShapeSize,
+              event.shiftKey,
+            )
+          : resizeRect(
+              original,
+              this.drag.handle,
+              point,
+              this.canvasSize,
+              this.config.minShapeSize,
+              event.shiftKey,
+            );
+      this.replaceAnnotation(resized, 'resize');
       return;
     }
 
@@ -1455,14 +1465,22 @@ export class OSDAnnotationEditor {
       return;
     }
 
+    if (selected.type === 'oriented-rect') {
+      // Named edge handles, not vertices: a rotated rectangle resizes the same
+      // way an upright one does, it just does it in its own frame.
+      for (const [handle, point] of orientedRectHandles(selected.geometry)) {
+        this.renderHandle(point, handle, selected.id, size, undefined, accent, selected.geometry.angle);
+      }
+      this.renderRotationHandle(selected, accent);
+      return;
+    }
+
     const points =
       selected.type === 'line'
         ? [selected.geometry.start, selected.geometry.end]
         : selected.type === 'point'
           ? [selected.geometry]
-          : selected.type === 'oriented-rect'
-            ? orientedRectCorners(selected.geometry)
-            : selected.geometry.points;
+          : selected.geometry.points;
     points.forEach((point, index) =>
       this.renderHandle(point, 'vertex', selected.id, size, index, accent),
     );
@@ -1485,22 +1503,26 @@ export class OSDAnnotationEditor {
     const anchor = this.rotationHandlePosition(selected);
     if (!anchor) return;
 
-    const centre = this.toElement(shapeCenter(selected));
-    const connector = createSvgElement('line');
-    connector.setAttribute('x1', String(centre.x));
-    connector.setAttribute('y1', String(centre.y));
-    connector.setAttribute('x2', String(anchor.x));
-    connector.setAttribute('y2', String(anchor.y));
-    connector.setAttribute('stroke', accent);
-    connector.setAttribute('stroke-width', '1');
-    connector.setAttribute('vector-effect', 'non-scaling-stroke');
-    connector.style.pointerEvents = 'none';
-    this.handleLayer.append(connector);
+    // A short stub from the top edge, not a line from the shape's centre. The
+    // centre version grew with the shape and with zoom, which is why it read as
+    // a stray line rather than as part of the selection.
+    const stub = createSvgElement('line');
+    stub.setAttribute('x1', String(anchor.base.x));
+    stub.setAttribute('y1', String(anchor.base.y));
+    stub.setAttribute('x2', String(anchor.handle.x));
+    stub.setAttribute('y2', String(anchor.handle.y));
+    stub.setAttribute('stroke', accent);
+    stub.setAttribute('stroke-width', '1.5');
+    stub.setAttribute('vector-effect', 'non-scaling-stroke');
+    stub.style.pointerEvents = 'none';
+    this.handleLayer.append(stub);
 
     const element = createSvgElement('circle');
+    // Constant screen radius, so the affordance does not change size with the
+    // shape or the zoom level.
     const radius = Math.max(5, this.config.handleSize / 2);
-    element.setAttribute('cx', String(anchor.x));
-    element.setAttribute('cy', String(anchor.y));
+    element.setAttribute('cx', String(anchor.handle.x));
+    element.setAttribute('cy', String(anchor.handle.y));
     element.setAttribute('r', String(radius));
     element.setAttribute('fill', accent);
     element.setAttribute('stroke', this.config.handleStrokeColor);
@@ -1515,19 +1537,52 @@ export class OSDAnnotationEditor {
     this.handleLayer.append(element);
   }
 
-  /** Rotation handle position, in element space, above the shape's top edge. */
-  private rotationHandlePosition(selected: ShapeData): Point | null {
+  /**
+   * Where the rotation stub starts and ends, in element space.
+   *
+   * The base sits on the middle of the shape's own top edge — for a rotated
+   * rectangle that is the rotated edge, not the top of its bounding box — and
+   * the handle sits a fixed screen distance beyond it, along the direction that
+   * edge faces. The stub therefore turns with the shape, which is how every
+   * familiar editor draws it.
+   */
+  private rotationHandlePosition(
+    selected: ShapeData,
+  ): { base: Point; handle: Point } | null {
+    const distanceOut = this.config.rotation.handleDistance ?? 28;
+
+    if (selected.type === 'oriented-rect') {
+      const corners = orientedRectCorners(selected.geometry).map((point) =>
+        this.toElement(point),
+      );
+      const topLeft = corners[0];
+      const topRight = corners[1];
+      const centre = this.toElement(shapeCenter(selected));
+      if (!topLeft || !topRight) return null;
+
+      const base = { x: (topLeft.x + topRight.x) / 2, y: (topLeft.y + topRight.y) / 2 };
+      // Outward from the centre through the top edge's midpoint.
+      const dx = base.x - centre.x;
+      const dy = base.y - centre.y;
+      const length = Math.hypot(dx, dy) || 1;
+      return {
+        base,
+        handle: { x: base.x + (dx / length) * distanceOut, y: base.y + (dy / length) * distanceOut },
+      };
+    }
+
     const projected = toPolygonPoints(selected).map((point) => this.toElement(point));
     if (projected.length === 0) return null;
 
     const bounds = boundsOfPoints(projected);
-    const distance = this.config.rotation.handleDistance ?? 28;
-    const centre = { x: bounds.x + bounds.w / 2, y: bounds.y };
-
+    const base = { x: bounds.x + bounds.w / 2, y: bounds.y };
     // Offset along the viewport's own up direction, so the handle sits above
     // the shape as the reader sees it even when the whole canvas is rotated.
     const up = -this.viewportRotation();
-    return rotatePoint({ x: centre.x, y: centre.y - distance }, up, centre);
+    return {
+      base,
+      handle: rotatePoint({ x: base.x, y: base.y - distanceOut }, up, base),
+    };
   }
 
   private renderHandle(
@@ -1537,6 +1592,7 @@ export class OSDAnnotationEditor {
     size: number,
     vertexIndex?: number,
     accent?: string,
+    shapeRotation = 0,
   ) {
     const projected = this.toElement(point);
     const element = createSvgElement('rect');
@@ -1553,7 +1609,7 @@ export class OSDAnnotationEditor {
     element.dataset.handle = handle;
     if (vertexIndex != null) element.dataset.vertexIndex = String(vertexIndex);
     element.style.pointerEvents = 'all';
-    element.style.cursor = handle === 'vertex' ? 'move' : this.resizeCursor(handle);
+    element.style.cursor = handle === 'vertex' ? 'move' : this.resizeCursor(handle, shapeRotation);
     this.handleLayer.append(element);
   }
 
@@ -1564,12 +1620,12 @@ export class OSDAnnotationEditor {
    * a cursor that disagrees with the direction the handle actually moves is
    * worse than no cursor at all.
    */
-  private resizeCursor(handle: string): string {
+  private resizeCursor(handle: string, shapeRotation = 0): string {
     const directions = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
     const index = directions.indexOf(handle);
     if (index === -1) return 'move';
 
-    const rotation = normalizeAngle(this.viewportRotation());
+    const rotation = normalizeAngle(this.viewportRotation() + shapeRotation);
     const steps = Math.round(rotation / 45);
     const rotated = directions[(index + steps) % directions.length] as string;
     return `${rotated}-resize`;
@@ -1656,10 +1712,19 @@ export class OSDAnnotationEditor {
     // vertex handle underneath would otherwise win by proximity.
     if (this.config.rotation.enabled && selected.type !== 'point') {
       const anchor = this.rotationHandlePosition(selected);
-      if (anchor && distance(this.toElement(point), anchor) <= tolerance + 2) {
+      if (anchor && distance(this.toElement(point), anchor.handle) <= tolerance + 2) {
         return { kind: 'handle', annotation: selected, handle: 'rotate' };
       }
     }
+    if (selected.type === 'oriented-rect') {
+      for (const [name, handlePoint] of orientedRectHandles(selected.geometry)) {
+        if (this.elementDistance(point, handlePoint) <= tolerance) {
+          return { kind: 'handle', annotation: selected, handle: name };
+        }
+      }
+      return null;
+    }
+
     if (selected.type === 'rect') {
       const rect = normalizeRect(selected.geometry);
       const handles: Array<[string, Point]> = [
@@ -1684,9 +1749,7 @@ export class OSDAnnotationEditor {
         ? [selected.geometry.start, selected.geometry.end]
         : selected.type === 'point'
           ? [selected.geometry]
-          : selected.type === 'oriented-rect'
-            ? orientedRectCorners(selected.geometry)
-            : selected.geometry.points;
+          : selected.geometry.points;
     for (let index = 0; index < points.length; index += 1) {
       if (this.elementDistance(point, points[index]) <= tolerance) {
         return {

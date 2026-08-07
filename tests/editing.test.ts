@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   constrainDrawnRect,
+  orientedRectCorners,
+  resizeOrientedRect,
   insertVertex,
   nearestSegment,
   pathLength,
@@ -178,5 +180,111 @@ describe('capabilities', () => {
       keyboard: true,
       orientedRect: true,
     });
+  });
+});
+
+describe('resizing a rotated rectangle', () => {
+  const rotated = (angle: number): ShapeData => ({
+    id: 'o',
+    type: 'oriented-rect',
+    geometry: { center: { x: 100, y: 100 }, w: 80, h: 40, angle },
+  });
+
+  it('offers named edge handles rather than inert vertices', () => {
+    const editor = createEditor({ annotations: [rotated(30)], selectedId: 'o' });
+    const container = editor.getAnnotation('o') ? document.body : document.body;
+    const handles = [...container.querySelectorAll('[data-handle]')]
+      .map((element) => element.getAttribute('data-handle'))
+      .filter((handle) => handle !== 'rotate');
+
+    expect(handles).toEqual(expect.arrayContaining(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']));
+  });
+
+  it('resizes in the shape own frame, keeping the angle', () => {
+    const next = resizeOrientedRect(
+      rotated(0) as Extract<ShapeData, { type: 'oriented-rect' }>,
+      'e',
+      { x: 180, y: 100 },
+      { width: 8, height: 8 },
+      false,
+    );
+    expect(next.geometry.w).toBeCloseTo(120);
+    expect(next.geometry.h).toBeCloseTo(40);
+    expect(next.geometry.angle).toBe(0);
+    // The west edge stayed put, so the centre moved half the growth.
+    expect(next.geometry.center.x).toBeCloseTo(120);
+  });
+
+  it('keeps the opposite edge fixed when rotated', () => {
+    const shape = rotated(90) as Extract<ShapeData, { type: 'oriented-rect' }>;
+    // At 90 degrees the shape's local +x points down the screen.
+    const next = resizeOrientedRect(shape, 'e', { x: 100, y: 180 }, { width: 8, height: 8 }, false);
+
+    expect(next.geometry.angle).toBe(90);
+    expect(next.geometry.w).toBeCloseTo(120);
+    // The shape grew downward, so the centre moved down, not right.
+    expect(next.geometry.center.x).toBeCloseTo(100);
+    expect(next.geometry.center.y).toBeCloseTo(120);
+  });
+
+  it('never shrinks below the minimum size', () => {
+    const next = resizeOrientedRect(
+      rotated(45) as Extract<ShapeData, { type: 'oriented-rect' }>,
+      'e',
+      { x: -500, y: -500 },
+      { width: 8, height: 8 },
+      false,
+    );
+    expect(next.geometry.w).toBeGreaterThanOrEqual(8);
+    expect(next.geometry.h).toBeGreaterThanOrEqual(8);
+  });
+
+  it('does not shear the shape', () => {
+    const shape = rotated(37) as Extract<ShapeData, { type: 'oriented-rect' }>;
+    const next = resizeOrientedRect(shape, 'se', { x: 200, y: 200 }, { width: 8, height: 8 }, false);
+
+    const corners = orientedRectCorners(next.geometry);
+    const side = (a: number, b: number) =>
+      Math.hypot(corners[a]!.x - corners[b]!.x, corners[a]!.y - corners[b]!.y);
+
+    // Opposite sides stay equal, which they would not if the resize had been
+    // applied in screen space.
+    expect(side(0, 1)).toBeCloseTo(side(3, 2), 6);
+    expect(side(1, 2)).toBeCloseTo(side(0, 3), 6);
+  });
+});
+
+describe('rotation affordance', () => {
+  it('draws a stub of constant length, not a line from the centre', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    Object.defineProperty(container, 'getBoundingClientRect', {
+      value: () => ({ x: 0, y: 0, left: 0, top: 0, width: 1000, height: 800, toJSON: () => ({}) }),
+    });
+
+    const small: ShapeData = { id: 's', type: 'rect', geometry: { x: 10, y: 10, w: 20, h: 20 } };
+    const large: ShapeData = { id: 's', type: 'rect', geometry: { x: 10, y: 10, w: 600, h: 400 } };
+
+    const lengthFor = (shape: ShapeData) => {
+      container.replaceChildren();
+      new OSDAnnotationEditor({
+        viewer: { container },
+        canvasSize: { width: 1000, height: 800 },
+        annotations: [shape],
+        selectedId: 's',
+        config: { rotation: { enabled: true } },
+      } as OSDAnnotationEditorOptions);
+
+      const stub = [...container.querySelectorAll('line')].at(-1);
+      const x1 = Number(stub?.getAttribute('x1'));
+      const y1 = Number(stub?.getAttribute('y1'));
+      const x2 = Number(stub?.getAttribute('x2'));
+      const y2 = Number(stub?.getAttribute('y2'));
+      return Math.hypot(x2 - x1, y2 - y1);
+    };
+
+    // The stub is the same length whatever the shape's size.
+    expect(lengthFor(small)).toBeCloseTo(lengthFor(large), 6);
+    expect(lengthFor(small)).toBeCloseTo(28, 6);
   });
 });
