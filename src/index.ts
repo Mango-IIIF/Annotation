@@ -1,4 +1,73 @@
 export { OSDAnnotationEditor } from './editor';
+export {
+  bakeRotation,
+  basePoints,
+  constrainDrawnRect,
+  insertVertex,
+  rectCorners,
+  resizeHandlesFor,
+  nearestSegment,
+  pathLength,
+  polygonArea,
+  projectOntoSegment,
+  removeVertex,
+} from './geometry';
+export { AnnotationStore, DuplicateAnnotationError } from './store';
+export type {
+  InteractionPolicyResolver,
+  MutationOptions,
+  ReplacementMode,
+  SetAnnotationsOptions,
+  StoreOptions,
+} from './store';
+export { CommandHistory, invertEntry } from './history';
+export type {
+  AnnotationChange,
+  ChangeKind,
+  ChangeOperation,
+  HistoryEntry,
+  HistoryPolicy,
+  HistoryState,
+} from './history';
+export {
+  elementToImage,
+  hasAccurateProjection,
+  imageToElement,
+  matrixToTransform,
+  projectionMatrix,
+} from './coordinates';
+export type { ProjectionMatrix } from './coordinates';
+export {
+  angleOf,
+  applyMatrix,
+  boundsOfPoints,
+  centroid,
+  compose,
+  constrainShape,
+  IDENTITY,
+  multiply,
+  normalizeAngle,
+  outlineContainsPoint,
+  rotatePoint,
+  rotateShape,
+  rotationMatrix,
+  scaleMatrix,
+  scalePoint,
+  scaleShape,
+  shapeCenter,
+  shapePivot,
+  shapeRotation,
+  signedAngle,
+  snapAngle,
+  snapAngleWithCardinals,
+  toPolygonPoints,
+  transformedBounds,
+  transformShape,
+  translateShape,
+  translationMatrix,
+} from './transform';
+export type { Matrix } from './transform';
+export type { CoordinateOptions } from './coordinates';
 export type {
   AnnotationStyle,
   AnnotationTheme,
@@ -14,7 +83,15 @@ export type {
   PointAnnotation,
   PolygonAnnotation,
   RectAnnotation,
+  RectGeometry,
   ShapeData,
   ShapeGeometry,
   ShapeType,
+  AnnotationRenderer,
+  InteractionPolicy,
+  KeyboardConfig,
+  LabelPlacement,
+  LabelSpec,
+  RenderContext,
+  RotationConfig,
 } from './types';

@@ -1,3 +1,4 @@
+import { elementToImage, imageToElement, type CoordinateOptions } from './coordinates';
 import { DEFAULT_STYLE } from './defaults';
 import type {
   AnnotationStyle,
@@ -30,123 +31,67 @@ export function resolveStyle(
   };
 }
 
+/**
+ * Applies every declared style field.
+ *
+ * `fillOpacity` and `activeColor` were previously declared in
+ * `AnnotationStyle`, set in `DEFAULT_STYLE`, and then never read — selection
+ * was signalled only by adding one to the stroke width, and a host setting
+ * either field saw nothing happen.
+ */
 export function applyShapeStyle(
   element: SVGElement,
   style: AnnotationStyle,
   options?: { active?: boolean; fill?: boolean },
 ) {
+  const active = options?.active ?? false;
+  // The stroke stays the layer colour even when selected: that colour is how a
+  // reader tells which layer a shape belongs to, and losing it on selection
+  // would hide exactly the thing the layer palette exists to show. Selection is
+  // signalled by the heavier stroke and by `activeColor` on the handles.
   element.setAttribute('stroke', style.strokeColor);
-  element.setAttribute('stroke-width', String(options?.active ? style.strokeWidth + 1 : style.strokeWidth));
+  element.setAttribute(
+    'stroke-width',
+    String(active ? style.strokeWidth + 1 : style.strokeWidth),
+  );
   element.setAttribute('vector-effect', 'non-scaling-stroke');
   element.setAttribute('opacity', String(style.opacity));
-  element.setAttribute('fill', options?.fill === false ? 'none' : style.fillColor);
+
+  if (options?.fill === false) {
+    element.setAttribute('fill', 'none');
+    return;
+  }
+  element.setAttribute('fill', style.fillColor);
+  if (style.fillOpacity !== undefined) {
+    element.setAttribute('fill-opacity', String(style.fillOpacity));
+  }
 }
 
+/**
+ * Image coordinates to viewer-element coordinates.
+ *
+ * Delegates to the coordinate module. Kept as a named export because the editor
+ * and its tests import it directly.
+ */
 export function pointToElement(
   viewer: OSDLikeViewer,
   point: Point,
   canvasSize: CanvasSize,
+  options?: CoordinateOptions,
 ): Point {
-  const viewport = viewer.viewport as any;
-  const viewportPoint =
-    typeof viewport?.imageToViewportCoordinates === 'function'
-      ? viewport.imageToViewportCoordinates(point.x, point.y)
-      : null;
-  const projected =
-    viewportPoint && numericViewportToViewerElement(viewer, viewportPoint)
-      ? numericViewportToViewerElement(viewer, viewportPoint)
-      : viewer.viewport?.imageToViewerElementCoordinates?.(
-          createViewportPoint(viewer, point),
-        );
-  if (projected && Number.isFinite(projected.x) && Number.isFinite(projected.y)) {
-    return projected;
-  }
-  const rect = viewer.container.getBoundingClientRect();
-  return {
-    x: (point.x / canvasSize.width) * rect.width,
-    y: (point.y / canvasSize.height) * rect.height,
-  };
+  return imageToElement(viewer, point, canvasSize, options);
 }
 
+/** Viewer-element coordinates to image coordinates. */
 export function elementToPoint(
   viewer: OSDLikeViewer,
   point: Point,
   canvasSize: CanvasSize,
+  options?: CoordinateOptions,
 ): Point {
-  const viewport = viewer.viewport as any;
-  const viewportPoint = numericViewerElementToViewport(viewer, point);
-  const converted =
-    viewportPoint && typeof viewport?.viewportToImageCoordinates === 'function'
-      ? viewport.viewportToImageCoordinates(viewportPoint.x, viewportPoint.y)
-      : viewer.viewport?.viewerElementToImageCoordinates?.(
-          createViewportPoint(viewer, point),
-        );
-  if (converted && Number.isFinite(converted.x) && Number.isFinite(converted.y)) {
-    return converted;
-  }
-  const rect = viewer.container.getBoundingClientRect();
-  return {
-    x: (point.x / Math.max(1, rect.width)) * canvasSize.width,
-    y: (point.y / Math.max(1, rect.height)) * canvasSize.height,
-  };
+  return elementToImage(viewer, point, canvasSize, options);
 }
 
 export function svgPoints(points: Point[]) {
   return points.map((point) => `${point.x},${point.y}`).join(' ');
-}
-
-function createViewportPoint(viewer: OSDLikeViewer, point: Point) {
-  const viewport = viewer.viewport as any;
-  const center = viewport?.getCenter?.(true) ?? viewport?.getCenter?.();
-  const PointCtor = center?.constructor;
-  if (typeof PointCtor === 'function') {
-    return new PointCtor(point.x, point.y);
-  }
-  return point;
-}
-
-function numericViewerElementToViewport(viewer: OSDLikeViewer, point: Point): Point | null {
-  const viewport = viewer.viewport as any;
-  const bounds = viewport?.getBoundsNoRotate?.(true);
-  const innerSize = viewport?._containerInnerSize;
-  const margins = viewport?._margins ?? { left: 0, top: 0 };
-  if (
-    !bounds ||
-    !Number.isFinite(bounds.x) ||
-    !Number.isFinite(bounds.y) ||
-    !Number.isFinite(bounds.width) ||
-    !innerSize ||
-    !Number.isFinite(innerSize.x) ||
-    innerSize.x === 0
-  ) {
-    return null;
-  }
-  const scale = innerSize.x / bounds.width;
-  return {
-    x: (point.x - margins.left) / scale + bounds.x,
-    y: (point.y - margins.top) / scale + bounds.y,
-  };
-}
-
-function numericViewportToViewerElement(viewer: OSDLikeViewer, point: Point): Point | null {
-  const viewport = viewer.viewport as any;
-  const bounds = viewport?.getBoundsNoRotate?.(true);
-  const innerSize = viewport?._containerInnerSize;
-  const margins = viewport?._margins ?? { left: 0, top: 0 };
-  if (
-    !bounds ||
-    !Number.isFinite(bounds.x) ||
-    !Number.isFinite(bounds.y) ||
-    !Number.isFinite(bounds.width) ||
-    !innerSize ||
-    !Number.isFinite(innerSize.x) ||
-    innerSize.x === 0
-  ) {
-    return null;
-  }
-  const scale = innerSize.x / bounds.width;
-  return {
-    x: (point.x - bounds.x) * scale + margins.left,
-    y: (point.y - bounds.y) * scale + margins.top,
-  };
 }
