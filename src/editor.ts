@@ -96,6 +96,10 @@ type DragState =
       startAngle: number;
       /** The shape's angle when the gesture began. */
       originalAngle: number;
+      /** Stub direction at gesture start, degrees clockwise from screen up. */
+      baseDirectionAngle: number;
+      /** How far the gesture has turned the shape so far. */
+      appliedDelta: number;
     };
 
 type Hit =
@@ -593,7 +597,15 @@ export class OSDAnnotationEditor {
       delta = snapped - drag.originalAngle;
     }
 
+    drag.appliedDelta = delta;
     return rotateShape(drag.original, delta, drag.pivot) as ShapeData;
+  }
+
+  /** The stub's resting angle for a shape, clockwise from screen up. */
+  private stubAngleFor(selected: ShapeData): number {
+    if (selected.type !== 'oriented-rect') return 0;
+    const direction = this.rotationDirection(selected);
+    return normalizeAngle(Math.atan2(direction.x, -direction.y) * (180 / Math.PI));
   }
 
   private isSnapModifierHeld(event: PointerEvent | KeyboardEvent): boolean {
@@ -736,6 +748,8 @@ export class OSDAnnotationEditor {
             startAngle: angleOf(pivot, point),
             originalAngle:
               hit.annotation.type === 'oriented-rect' ? hit.annotation.geometry.angle : 0,
+            baseDirectionAngle: this.stubAngleFor(hit.annotation),
+            appliedDelta: 0,
           };
           return;
         }
@@ -1538,18 +1552,24 @@ export class OSDAnnotationEditor {
   }
 
   /**
-   * Where the rotation stub starts and ends, in element space.
+   * The direction the rotation stub points, as a unit vector in element space.
    *
-   * The base sits on the middle of the shape's own top edge — for a rotated
-   * rectangle that is the rotated edge, not the top of its bounding box — and
-   * the handle sits a fixed screen distance beyond it, along the direction that
-   * edge faces. The stub therefore turns with the shape, which is how every
-   * familiar editor draws it.
+   * An oriented rectangle carries its own angle, so the stub follows the
+   * shape's own up direction and turns with it. A polygon or path stores only
+   * points and has no angle to read, so the stub rests at screen up — stable
+   * and predictable rather than derived from whichever vertex happens to be
+   * highest.
+   *
+   * While a rotation gesture is running, the direction follows the pointer, so
+   * the handle stays under the cursor that is holding it instead of jumping
+   * around as the shape's bounding box changes underneath.
    */
-  private rotationHandlePosition(
-    selected: ShapeData,
-  ): { base: Point; handle: Point } | null {
-    const distanceOut = this.config.rotation.handleDistance ?? 28;
+  private rotationDirection(selected: ShapeData): Point {
+    const drag = this.drag;
+    if (drag?.kind === 'rotate' && drag.id === selected.id) {
+      const radians = (drag.appliedDelta + drag.baseDirectionAngle) * (Math.PI / 180);
+      return { x: Math.sin(radians), y: -Math.cos(radians) };
+    }
 
     if (selected.type === 'oriented-rect') {
       const corners = orientedRectCorners(selected.geometry).map((point) =>
@@ -1558,30 +1578,57 @@ export class OSDAnnotationEditor {
       const topLeft = corners[0];
       const topRight = corners[1];
       const centre = this.toElement(shapeCenter(selected));
-      if (!topLeft || !topRight) return null;
-
-      const base = { x: (topLeft.x + topRight.x) / 2, y: (topLeft.y + topRight.y) / 2 };
-      // Outward from the centre through the top edge's midpoint.
-      const dx = base.x - centre.x;
-      const dy = base.y - centre.y;
-      const length = Math.hypot(dx, dy) || 1;
-      return {
-        base,
-        handle: { x: base.x + (dx / length) * distanceOut, y: base.y + (dy / length) * distanceOut },
-      };
+      if (topLeft && topRight) {
+        const midpoint = { x: (topLeft.x + topRight.x) / 2, y: (topLeft.y + topRight.y) / 2 };
+        const dx = midpoint.x - centre.x;
+        const dy = midpoint.y - centre.y;
+        const length = Math.hypot(dx, dy);
+        if (length > 0) return { x: dx / length, y: dy / length };
+      }
     }
 
+    // Element space already carries the viewport's rotation, so screen up is
+    // simply negative y. The previous code rotated by -viewportRotation here,
+    // which applied that correction a second time.
+    return { x: 0, y: -1 };
+  }
+
+  /**
+   * Where the rotation stub starts and ends, in element space.
+   *
+   * The base sits where the shape's own silhouette ends in the stub's
+   * direction, so the stub always touches the shape. Anchoring to the top of
+   * the bounding box instead left it floating in empty space beside anything
+   * that is not roughly rectangular — a triangle, or any polygon whose highest
+   * point is off to one side.
+   */
+  private rotationHandlePosition(
+    selected: ShapeData,
+  ): { base: Point; handle: Point } | null {
     const projected = toPolygonPoints(selected).map((point) => this.toElement(point));
     if (projected.length === 0) return null;
 
-    const bounds = boundsOfPoints(projected);
-    const base = { x: bounds.x + bounds.w / 2, y: bounds.y };
-    // Offset along the viewport's own up direction, so the handle sits above
-    // the shape as the reader sees it even when the whole canvas is rotated.
-    const up = -this.viewportRotation();
+    const centre = this.toElement(shapeCenter(selected));
+    const direction = this.rotationDirection(selected);
+    const distanceOut = this.config.rotation.handleDistance ?? 28;
+
+    // How far the outline reaches in that direction.
+    let extent = 0;
+    for (const point of projected) {
+      const reach = (point.x - centre.x) * direction.x + (point.y - centre.y) * direction.y;
+      if (reach > extent) extent = reach;
+    }
+
+    const base = {
+      x: centre.x + direction.x * extent,
+      y: centre.y + direction.y * extent,
+    };
     return {
       base,
-      handle: rotatePoint({ x: base.x, y: base.y - distanceOut }, up, base),
+      handle: {
+        x: base.x + direction.x * distanceOut,
+        y: base.y + direction.y * distanceOut,
+      },
     };
   }
 

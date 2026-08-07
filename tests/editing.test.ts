@@ -288,3 +288,122 @@ describe('rotation affordance', () => {
     expect(lengthFor(small)).toBeCloseTo(28, 6);
   });
 });
+
+describe('rotation stub across shape types', () => {
+  const container = () => {
+    const element = document.createElement('div');
+    document.body.append(element);
+    Object.defineProperty(element, 'getBoundingClientRect', {
+      value: () => ({ x: 0, y: 0, left: 0, top: 0, width: 1000, height: 800, toJSON: () => ({}) }),
+    });
+    return element;
+  };
+
+  const stubFor = (shape: ShapeData) => {
+    const host = container();
+    new OSDAnnotationEditor({
+      viewer: { container: host },
+      canvasSize: { width: 1000, height: 800 },
+      annotations: [shape],
+      selectedId: shape.id,
+      config: { rotation: { enabled: true } },
+    } as OSDAnnotationEditorOptions);
+
+    const line = [...host.querySelectorAll('line')].at(-1);
+    const circle = [...host.querySelectorAll('circle')].at(-1);
+    return {
+      base: { x: Number(line?.getAttribute('x1')), y: Number(line?.getAttribute('y1')) },
+      handle: { x: Number(circle?.getAttribute('cx')), y: Number(circle?.getAttribute('cy')) },
+    };
+  };
+
+  it('anchors to the silhouette of a downward-pointing triangle, not its bounding box', () => {
+    // Apex at the bottom, flat edge on top. The old code anchored to the top of
+    // the bounding box regardless, which for a spikier shape sits in open space.
+    const triangle: ShapeData = {
+      id: 'tri',
+      type: 'polygon',
+      geometry: { points: [{ x: 100, y: 100 }, { x: 300, y: 100 }, { x: 200, y: 300 }] },
+    };
+
+    const { base, handle } = stubFor(triangle);
+    // The flat top edge is at y=100, and the stub rises from the centre line.
+    expect(base.y).toBeCloseTo(100, 3);
+    expect(base.x).toBeCloseTo(200, 3);
+    // The handle sits a fixed distance beyond it, straight up.
+    expect(handle.y).toBeCloseTo(base.y - 28, 3);
+    expect(handle.x).toBeCloseTo(base.x, 3);
+  });
+
+  it('touches the silhouette of an upward-pointing triangle', () => {
+    const triangle: ShapeData = {
+      id: 'tri2',
+      type: 'polygon',
+      geometry: { points: [{ x: 200, y: 100 }, { x: 300, y: 300 }, { x: 100, y: 300 }] },
+    };
+
+    const { base } = stubFor(triangle);
+    // The apex is the highest point, so the stub starts level with it.
+    expect(base.y).toBeCloseTo(100, 3);
+  });
+
+  it('rests at screen up for a polygon, which has no angle of its own', () => {
+    const skewed: ShapeData = {
+      id: 'skew',
+      type: 'polygon',
+      geometry: {
+        points: [{ x: 100, y: 200 }, { x: 400, y: 100 }, { x: 350, y: 300 }, { x: 120, y: 320 }],
+      },
+    };
+
+    const { base, handle } = stubFor(skewed);
+    // Straight up from the base, whatever the polygon's shape.
+    expect(handle.x).toBeCloseTo(base.x, 6);
+    expect(handle.y).toBeCloseTo(base.y - 28, 6);
+  });
+
+  it('turns with an oriented rectangle', () => {
+    const upright = stubFor({
+      id: 'o1',
+      type: 'oriented-rect',
+      geometry: { center: { x: 200, y: 200 }, w: 100, h: 60, angle: 0 },
+    });
+    const turned = stubFor({
+      id: 'o2',
+      type: 'oriented-rect',
+      geometry: { center: { x: 200, y: 200 }, w: 100, h: 60, angle: 90 },
+    });
+
+    // Upright: the stub points up. At 90 degrees clockwise: it points right.
+    expect(upright.handle.y).toBeLessThan(upright.base.y);
+    expect(turned.handle.x).toBeGreaterThan(turned.base.x);
+    expect(Math.abs(turned.handle.y - turned.base.y)).toBeLessThan(1);
+  });
+
+  it('keeps the stub a constant length for every shape type', () => {
+    const shapes: ShapeData[] = [
+      { id: 'a', type: 'rect', geometry: { x: 10, y: 10, w: 400, h: 300 } },
+      {
+        id: 'b',
+        type: 'polygon',
+        geometry: { points: [{ x: 10, y: 10 }, { x: 300, y: 40 }, { x: 120, y: 260 }] },
+      },
+      {
+        id: 'c',
+        type: 'freehand',
+        geometry: { points: [{ x: 10, y: 10 }, { x: 90, y: 120 }, { x: 260, y: 60 }] },
+      },
+      {
+        id: 'd',
+        type: 'oriented-rect',
+        geometry: { center: { x: 200, y: 200 }, w: 120, h: 80, angle: 37 },
+      },
+    ];
+
+    for (const shape of shapes) {
+      const { base, handle } = stubFor(shape);
+      const length = Math.hypot(handle.x - base.x, handle.y - base.y);
+      expect(length, `stub length for ${shape.type}`).toBeCloseTo(28, 6);
+    }
+  });
+});
