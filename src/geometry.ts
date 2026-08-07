@@ -188,12 +188,28 @@ export function translateAnnotation<T extends ShapeData>(
   };
 }
 
+/**
+ * Moves one vertex to a point given in canvas coordinates.
+ *
+ * When the shape carries a rotation, the rotation is baked into its points
+ * first and the angle reset to zero. The shape looks identical at that moment,
+ * and editing then happens in the same space the pointer is in.
+ *
+ * The alternative — keeping the angle and mapping the pointer back into the
+ * shape's frame — moves the pivot as soon as a vertex changes the bounds, which
+ * shifts every other vertex on screen while the user is dragging just one.
+ */
 export function updateVertex<T extends ShapeData>(
   annotation: T,
   vertexIndex: number,
   point: Point,
   canvasSize: CanvasSize,
 ): T {
+  if (shapeRotation(annotation) !== 0) {
+    const baked = bakeRotation(annotation);
+    return updateVertex(baked, vertexIndex, point, canvasSize) as T;
+  }
+
   const nextPoint = constrainPoint(point, canvasSize);
   if (annotation.type === 'point') {
     return { ...annotation, geometry: nextPoint };
@@ -492,4 +508,31 @@ export function resizeHandlesFor(annotation: ShapeData): Array<[string, Point]> 
 
   if (rotation === 0) return local;
   return local.map(([name, point]) => [name, rotatePoint(point, rotation, pivot)]);
+}
+
+/**
+ * Rewrites a shape's geometry as its drawn outline, clearing its rotation.
+ *
+ * The shape occupies exactly the same region afterwards; only its description
+ * changes. A rectangle cannot describe a turned rectangle, so one becomes a
+ * polygon rather than being silently squared up to its bounding box.
+ */
+export function bakeRotation<T extends ShapeData>(annotation: T): ShapeData {
+  const rotation = shapeRotation(annotation);
+  if (rotation === 0) return annotation;
+
+  const outline = pointsFor(annotation);
+
+  if (annotation.type === 'point') {
+    return { ...annotation, rotation: 0 };
+  }
+  if (annotation.type === 'line') {
+    const [start, end] = outline;
+    if (!start || !end) return { ...annotation, rotation: 0 };
+    return { ...annotation, geometry: { start, end }, rotation: 0 };
+  }
+  if (annotation.type === 'rect') {
+    return { ...annotation, type: 'polygon', geometry: { points: outline }, rotation: 0 } as ShapeData;
+  }
+  return { ...annotation, geometry: { points: outline }, rotation: 0 };
 }

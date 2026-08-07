@@ -82,6 +82,10 @@ render extension points, and keyboard operation.
 - The stub anchors to the shape's own silhouette rather than to its bounding
   box, so it touches the shape whatever its outline — a triangle, or any polygon
   whose highest point is off to one side.
+- Editing a vertex on a rotated shape bakes the rotation into its points and
+  resets the angle. The shape is unchanged at that moment, and editing then
+  happens in the same space the pointer is in. `bakeRotation` is exported for a
+  host that wants the same conversion.
 - `openseadragon` is now a declared optional peer dependency, `>=4.0.0`. Only
   5.x is exercised in CI.
 - The viewport event stream is coalesced to one render per animation frame.

@@ -1331,8 +1331,9 @@ export class OSDAnnotationEditor {
         applyShapeStyle(element, style, { active, fill: true });
       }
     } else if (annotation.type === 'line') {
-      const start = this.toElement(annotation.geometry.start);
-      const end = this.toElement(annotation.geometry.end);
+      const [rawStart, rawEnd] = pointsFor(annotation);
+      const start = this.toElement(rawStart ?? annotation.geometry.start);
+      const end = this.toElement(rawEnd ?? annotation.geometry.end);
       element = createSvgElement('line');
       element.setAttribute('x1', String(start.x));
       element.setAttribute('y1', String(start.y));
@@ -1341,7 +1342,10 @@ export class OSDAnnotationEditor {
       element.setAttribute('stroke-linecap', this.config.shapes.line?.lineCap ?? 'round');
       applyShapeStyle(element, style, { active, fill: false });
     } else {
-      const points = annotation.geometry.points.map((point) => this.toElement(point));
+      // pointsFor, not geometry.points: the outline as drawn carries the
+      // shape's rotation, and drawing the stored points would make a rotated
+      // polygon look exactly like an unrotated one.
+      const points = pointsFor(annotation).map((point) => this.toElement(point));
       element = createSvgElement(annotation.type === 'polygon' ? 'polygon' : 'polyline');
       element.setAttribute('points', points.map((point) => `${point.x},${point.y}`).join(' '));
       element.setAttribute('stroke-linecap', this.config.shapes.line?.lineCap ?? 'round');
@@ -1467,13 +1471,9 @@ export class OSDAnnotationEditor {
       return;
     }
 
-    const points =
-      selected.type === 'line'
-        ? [selected.geometry.start, selected.geometry.end]
-        : selected.type === 'point'
-          ? [selected.geometry]
-          : selected.geometry.points;
-    points.forEach((point, index) =>
+    // The drawn outline, so a handle sits on the vertex a user can see rather
+    // than on where that vertex would be if the shape were not turned.
+    pointsFor(selected).forEach((point, index) =>
       this.renderHandle(point, 'vertex', selected.id, size, index, accent),
     );
     this.renderRotationHandle(selected, accent);
@@ -1735,12 +1735,7 @@ export class OSDAnnotationEditor {
       }
       return null;
     }
-    const points =
-      selected.type === 'line'
-        ? [selected.geometry.start, selected.geometry.end]
-        : selected.type === 'point'
-          ? [selected.geometry]
-          : selected.geometry.points;
+    const points = pointsFor(selected);
     for (let index = 0; index < points.length; index += 1) {
       if (this.elementDistance(point, points[index]) <= tolerance) {
         return {

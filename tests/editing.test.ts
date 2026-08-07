@@ -3,6 +3,8 @@ import {
   constrainDrawnRect,
   resizeRect,
   rectCorners,
+  bakeRotation,
+  updateVertex,
   insertVertex,
   nearestSegment,
   pathLength,
@@ -459,5 +461,131 @@ describe('rotation persists on every shape type', () => {
     // Turned upright, the bar now covers its own centre column, not its row.
     expect(outlineContainsPoint(shape, { x: 250, y: 320 })).toBe(true);
     expect(outlineContainsPoint(shape, { x: 380, y: 200 })).toBe(false);
+  });
+});
+
+describe('a rotated shape is drawn where it actually is', () => {
+  const host = () => {
+    const element = document.createElement('div');
+    document.body.append(element);
+    Object.defineProperty(element, 'getBoundingClientRect', {
+      value: () => ({ x: 0, y: 0, left: 0, top: 0, width: 1000, height: 800, toJSON: () => ({}) }),
+    });
+    return element;
+  };
+
+  const render = (shape: ShapeData) => {
+    const container = host();
+    new OSDAnnotationEditor({
+      viewer: { container },
+      canvasSize: { width: 1000, height: 800 },
+      annotations: [shape],
+      selectedId: shape.id,
+      config: { rotation: { enabled: true } },
+    } as OSDAnnotationEditorOptions);
+    return container;
+  };
+
+  const asPairs = (points: { x: number; y: number }[]) =>
+    points.map((point) => `${point.x},${point.y}`).join(' ');
+
+  const triangle: ShapeData = {
+    id: 'p',
+    type: 'polygon',
+    geometry: { points: [{ x: 100, y: 100 }, { x: 300, y: 100 }, { x: 200, y: 300 }] },
+    rotation: 90,
+  };
+
+  it('renders a rotated polygon at its outline, not its stored points', () => {
+    const container = render(triangle);
+    const drawn = container.querySelector('[data-annotation-id="p"]')?.getAttribute('points');
+
+    expect(drawn).toBe(asPairs(toPolygonPoints(triangle)));
+    // The stored points are a different set; drawing those would make a
+    // rotated polygon indistinguishable from an unrotated one.
+    expect(drawn).not.toBe(asPairs(triangle.geometry.points as { x: number; y: number }[]));
+  });
+
+  it('renders a rotated freehand path at its outline', () => {
+    const path: ShapeData = {
+      id: 'f',
+      type: 'freehand',
+      geometry: { points: [{ x: 100, y: 100 }, { x: 200, y: 160 }, { x: 300, y: 120 }] },
+      rotation: 45,
+    };
+    const container = render(path);
+    expect(container.querySelector('[data-annotation-id="f"]')?.getAttribute('points')).toBe(
+      asPairs(toPolygonPoints(path)),
+    );
+  });
+
+  it('renders a rotated line at its outline', () => {
+    const line: ShapeData = {
+      id: 'l',
+      type: 'line',
+      geometry: { start: { x: 100, y: 100 }, end: { x: 300, y: 100 } },
+      rotation: 90,
+    };
+    const container = render(line);
+    const element = container.querySelector('[data-annotation-id="l"]');
+    const [start, end] = toPolygonPoints(line);
+
+    expect(Number(element?.getAttribute('x1'))).toBeCloseTo(start!.x, 6);
+    expect(Number(element?.getAttribute('y1'))).toBeCloseTo(start!.y, 6);
+    expect(Number(element?.getAttribute('x2'))).toBeCloseTo(end!.x, 6);
+    expect(Number(element?.getAttribute('y2'))).toBeCloseTo(end!.y, 6);
+  });
+
+  it('puts vertex handles on the vertices a user can see', () => {
+    const container = render(triangle);
+    const size = 10;
+    const handles = [...container.querySelectorAll('[data-handle="vertex"]')].map((element) => ({
+      x: Number(element.getAttribute('x')) + size / 2,
+      y: Number(element.getAttribute('y')) + size / 2,
+    }));
+
+    expect(handles).toEqual(toPolygonPoints(triangle));
+  });
+
+  it('bakes the rotation when a vertex is dragged, leaving the shape where it was', () => {
+    const editor = createEditor({ annotations: [triangle], selectedId: 'p' });
+    const before = toPolygonPoints(triangle);
+
+    // Drag the first vertex somewhere new.
+    const moved = updateVertex(triangle, 0, { x: 400, y: 400 }, { width: 1000, height: 800 });
+
+    // The angle is gone, folded into the points.
+    expect(moved.rotation).toBe(0);
+    const after = toPolygonPoints(moved);
+
+    // The untouched vertices have not moved on screen.
+    expect(after[1]!.x).toBeCloseTo(before[1]!.x, 6);
+    expect(after[1]!.y).toBeCloseTo(before[1]!.y, 6);
+    expect(after[2]!.x).toBeCloseTo(before[2]!.x, 6);
+    expect(after[2]!.y).toBeCloseTo(before[2]!.y, 6);
+    // And the dragged one landed where it was put.
+    expect(after[0]).toEqual({ x: 400, y: 400 });
+
+    expect(editor.getAnnotation('p')).toBeDefined();
+  });
+
+  it('bakes a rotated rectangle to a polygon rather than squaring it up', () => {
+    const turned: ShapeData = {
+      id: 'r',
+      type: 'rect',
+      geometry: { x: 100, y: 100, w: 200, h: 100 },
+      rotation: 30,
+    };
+    const baked = bakeRotation(turned);
+
+    expect(baked.type).toBe('polygon');
+    expect(baked.rotation).toBe(0);
+    // Same region, different description.
+    expect(toPolygonPoints(baked)).toEqual(toPolygonPoints(turned));
+  });
+
+  it('leaves an unrotated shape untouched when baking', () => {
+    const plain: ShapeData = { id: 'x', type: 'rect', geometry: { x: 0, y: 0, w: 10, h: 10 } };
+    expect(bakeRotation(plain)).toBe(plain);
   });
 });

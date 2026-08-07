@@ -1,5 +1,6 @@
 export { OSDAnnotationEditor } from './editor';
 export {
+  bakeRotation,
   basePoints,
   constrainDrawnRect,
   insertVertex,
