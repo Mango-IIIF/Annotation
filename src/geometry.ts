@@ -1,4 +1,32 @@
-import type { CanvasSize, Point, ShapeData } from './types';
+import type { CanvasSize, OrientedRectGeometry, Point, ShapeData } from './types';
+
+export const DEGREES_TO_RADIANS = Math.PI / 180;
+
+/** Rotates a point about an origin. Positive degrees turn clockwise on screen. */
+export function rotatePoint(point: Point, degrees: number, origin: Point): Point {
+  const radians = degrees * DEGREES_TO_RADIANS;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
+  return {
+    x: origin.x + dx * cos - dy * sin,
+    y: origin.y + dx * sin + dy * cos,
+  };
+}
+
+/** The four corners of an oriented rectangle, clockwise from its top-left. */
+export function orientedRectCorners(geometry: OrientedRectGeometry): Point[] {
+  const { center, w, h, angle } = geometry;
+  const halfW = w / 2;
+  const halfH = h / 2;
+  return [
+    { x: center.x - halfW, y: center.y - halfH },
+    { x: center.x + halfW, y: center.y - halfH },
+    { x: center.x + halfW, y: center.y + halfH },
+    { x: center.x - halfW, y: center.y + halfH },
+  ].map((corner) => rotatePoint(corner, angle, center));
+}
 
 export function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -59,6 +87,9 @@ export function pointsFor(annotation: ShapeData): Point[] {
   if (annotation.type === 'point') {
     return [annotation.geometry];
   }
+  if (annotation.type === 'oriented-rect') {
+    return orientedRectCorners(annotation.geometry);
+  }
   return annotation.geometry.points;
 }
 
@@ -85,6 +116,18 @@ export function translateAnnotation<T extends ShapeData>(
         { x: annotation.geometry.x + delta.x, y: annotation.geometry.y + delta.y },
         canvasSize,
       ),
+    };
+  }
+  if (annotation.type === 'oriented-rect') {
+    return {
+      ...annotation,
+      geometry: {
+        ...annotation.geometry,
+        center: {
+          x: annotation.geometry.center.x + delta.x,
+          y: annotation.geometry.center.y + delta.y,
+        },
+      },
     };
   }
   if (annotation.type === 'line') {
@@ -136,6 +179,9 @@ export function updateVertex<T extends ShapeData>(
           ? { ...annotation.geometry, start: nextPoint }
           : { ...annotation.geometry, end: nextPoint },
     };
+  }
+  if (annotation.type === 'oriented-rect') {
+    return annotation;
   }
   if (annotation.type === 'polygon' || annotation.type === 'freehand') {
     return {

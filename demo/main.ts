@@ -8,7 +8,12 @@ import {
   stringLabel,
   type NeutralShape,
 } from '@mango-iiif/w3c-parser';
-import { OSDAnnotationEditor, type CanonicalEditorMode, type ShapeData } from '../src';
+import {
+  OSDAnnotationEditor,
+  toPolygonPoints,
+  type CanonicalEditorMode,
+  type ShapeData,
+} from '../src';
 
 const tileSource = {
   type: 'image',
@@ -182,5 +187,10 @@ function toNeutralShape(annotation: ShapeData): NeutralShape {
       return { type: 'polygon', geometry: annotation.geometry };
     case 'freehand':
       return { type: 'freehand', geometry: annotation.geometry };
+    case 'oriented-rect':
+      // No IIIF selector represents an oriented rectangle, so it serializes as
+      // a polygon of its rotated corners. `toPolygonPoints` exists precisely so
+      // a host never has to work that out from the editor's SVG.
+      return { type: 'polygon', geometry: { points: toPolygonPoints(annotation) } };
   }
 }

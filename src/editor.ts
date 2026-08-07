@@ -1,6 +1,8 @@
 import { DEFAULT_CONFIG, DEFAULT_STYLE, OSD_EVENTS } from './defaults';
 import {
   boundsFor,
+  orientedRectCorners,
+  pointsFor,
   constrainPoint,
   distance,
   normalizeRect,
@@ -11,6 +13,18 @@ import {
   updateVertex,
 } from './geometry';
 import { modeToShape, normalizeMode } from './modes';
+import { AnnotationStore, type SetAnnotationsOptions } from './store';
+import type { AnnotationChange, ChangeOperation } from './history';
+import {
+  angleOf,
+  rotateShape,
+  shapeCenter,
+  signedAngle,
+  snapAngle,
+  snapAngleWithCardinals,
+  transformedBounds,
+  translateShape,
+} from './transform';
 import {
   applyShapeStyle,
   createSvgElement,
@@ -54,6 +68,17 @@ type DragState =
       id: string;
       vertexIndex: number;
       original: ShapeData;
+    }
+  | {
+      kind: 'rotate';
+      id: string;
+      original: ShapeData;
+      /** Shape centre in image space, the pivot unless the host overrides it. */
+      pivot: Point;
+      /** Pointer angle when the gesture began, so rotation is relative. */
+      startAngle: number;
+      /** The shape's angle when the gesture began. */
+      originalAngle: number;
     };
 
 type Hit =
@@ -62,12 +87,26 @@ type Hit =
 
 const CLASS_NAME = 'mango-annotation-editor';
 
+const gestureOperation = (drag: DragState): ChangeOperation => {
+  switch (drag.kind) {
+    case 'move':
+      return 'move';
+    case 'resize-rect':
+      return 'resize';
+    case 'vertex':
+      return 'vertex';
+    case 'rotate':
+      return 'rotate';
+    default:
+      return 'draw';
+  }
+};
+
 export class OSDAnnotationEditor {
   private viewer: OSDLikeViewer;
   private canvasSize: CanvasSize;
   private mode: CanonicalEditorMode;
-  private annotations: ShapeData[];
-  private selectedId: string | null;
+  private store: AnnotationStore;
   private currentLayer?: string;
   private style: Partial<AnnotationStyle>;
   private theme: AnnotationTheme;
@@ -84,6 +123,10 @@ export class OSDAnnotationEditor {
   private polygonDraft: Point[] = [];
   private lastPolygonClick: { point: Point; time: number } | null = null;
   private destroyed = false;
+  private renderScheduled = false;
+  private suspendDepth = 0;
+  private frameHandle: number | null = null;
+  private containerPosition: string | null = null;
   private keyboardTarget: Window | HTMLElement;
   private removeHandlers: Array<() => void> = [];
   private callbacks: Pick<
@@ -93,14 +136,28 @@ export class OSDAnnotationEditor {
     | 'onAnnotationUpdated'
     | 'onAnnotationDeleted'
     | 'onModeChanged'
+    | 'onAnnotationChanged'
   >;
 
   constructor(options: OSDAnnotationEditorOptions) {
     this.viewer = options.viewer;
     this.canvasSize = options.canvasSize;
     this.mode = normalizeMode(options.mode ?? 'select');
-    this.annotations = [...(options.annotations ?? [])];
-    this.selectedId = options.selectedId ?? null;
+    this.store = new AnnotationStore({
+      ...(options.annotations ? { annotations: options.annotations } : {}),
+      selectedId: options.selectedId ?? null,
+      ...(options.historyLimit === undefined ? {} : { historyLimit: options.historyLimit }),
+      ...(options.policy ? { policy: options.policy } : {}),
+      onChange: (changes) => {
+        for (const change of changes) this.emitChange(change);
+        this.renderUnlessSuspended();
+      },
+      onSelectionChanged: (id) => {
+        this.callbacks.onSelectionChanged?.(id);
+        this.renderUnlessSuspended();
+      },
+      ...(options.onHistoryChanged ? { onHistoryChanged: options.onHistoryChanged } : {}),
+    });
     this.currentLayer = options.currentLayer;
     this.style = { ...DEFAULT_STYLE, ...(options.style ?? {}) };
     this.theme = options.theme ?? {};
@@ -126,6 +183,7 @@ export class OSDAnnotationEditor {
       onAnnotationUpdated: options.onAnnotationUpdated,
       onAnnotationDeleted: options.onAnnotationDeleted,
       onModeChanged: options.onModeChanged,
+      onAnnotationChanged: options.onAnnotationChanged,
     };
     this.keyboardTarget = options.keyboardTarget ?? window;
     this.root = document.createElement('div');
@@ -169,32 +227,85 @@ export class OSDAnnotationEditor {
     return this.mode;
   }
 
-  setAnnotations(annotations: ShapeData[]) {
-    this.annotations = [...annotations];
-    if (this.selectedId && !this.annotations.some((item) => item.id === this.selectedId)) {
-      this.selectedId = null;
+  /**
+   * Replaces or merges the collection.
+   *
+   * The history policy defaults to `reset`, because the common caller is a host
+   * syncing a changed document, and preserved history would then point at
+   * shapes that no longer exist. Pass `preserve` for an idempotent sync.
+   */
+  setAnnotations(annotations: ShapeData[], options: SetAnnotationsOptions = {}) {
+    this.store.setAll(annotations, options);
+    this.renderUnlessSuspended();
+  }
+
+  /** Adds one annotation. Throws on a duplicate id. */
+  addAnnotation(annotation: ShapeData): ShapeData {
+    return this.store.add(annotation);
+  }
+
+  /** Updates one annotation, returning its previous value. */
+  updateAnnotation(annotation: ShapeData): ShapeData | undefined {
+    return this.store.update(annotation);
+  }
+
+  /** Removes one annotation, returning it. */
+  removeAnnotation(id: string): ShapeData | undefined {
+    return this.store.remove(id);
+  }
+
+  /** Runs several mutations as a single undoable step. */
+  batch<T>(run: () => T): T {
+    this.suspendDepth += 1;
+    try {
+      return this.store.batch('batch', run);
+    } finally {
+      this.suspendDepth -= 1;
+      this.renderUnlessSuspended();
     }
-    this.render();
+  }
+
+  get canUndo(): boolean {
+    return this.store.canUndo;
+  }
+
+  get canRedo(): boolean {
+    return this.store.canRedo;
+  }
+
+  undo(): boolean {
+    return this.store.undo();
+  }
+
+  redo(): boolean {
+    return this.store.redo();
+  }
+
+  clearHistory(): void {
+    this.store.clearHistory();
   }
 
   getAnnotations() {
-    return [...this.annotations];
+    return this.store.all();
+  }
+
+  /** One annotation by id, without copying the whole collection. */
+  getAnnotation(id: string): ShapeData | undefined {
+    return this.store.get(id);
+  }
+
+  getSelectedId(): string | null {
+    return this.store.selectedId;
   }
 
   select(id: string | null) {
-    const next = id && this.annotations.some((item) => item.id === id) ? id : null;
-    if (this.selectedId === next) return;
-    this.selectedId = next;
-    this.callbacks.onSelectionChanged?.(next);
-    this.render();
+    this.store.select(id);
   }
 
-  delete(id = this.selectedId) {
+  delete(id = this.store.selectedId) {
     if (!id) return;
-    this.annotations = this.annotations.filter((item) => item.id !== id);
-    if (this.selectedId === id) this.select(null);
-    this.callbacks.onAnnotationDeleted?.(id);
-    this.render();
+    if (!this.store.canDelete(id)) return;
+    this.store.remove(id, { operation: 'programmatic' });
   }
 
   updateCanvasSize(canvasSize: CanvasSize) {
@@ -249,6 +360,108 @@ export class OSDAnnotationEditor {
     for (const remove of this.removeHandlers) remove();
     this.removeHandlers = [];
     this.root.remove();
+  }
+
+  /**
+   * Renders now, unless a batch is open.
+   *
+   * A mutation a host made deliberately should be on screen before the call
+   * returns — deferring it means a host that mutates and then measures reads
+   * stale geometry. Only the viewport event stream, which fires every frame,
+   * is worth coalescing.
+   */
+  private renderUnlessSuspended() {
+    if (this.suspendDepth > 0 || this.destroyed) return;
+    this.render();
+  }
+
+  /**
+   * Coalesces render requests into one per animation frame.
+   *
+   * OpenSeadragon emits `animation` on every frame of a pan, and a batch
+   * mutation emits one change per shape. Rendering synchronously for each would
+   * rebuild the overlay dozens of times for a single visible update.
+   */
+  private scheduleRender() {
+    if (this.destroyed || this.renderScheduled) return;
+    this.renderScheduled = true;
+
+    const run = () => {
+      this.renderScheduled = false;
+      this.frameHandle = null;
+      this.render();
+    };
+
+    if (typeof requestAnimationFrame === 'function') {
+      this.frameHandle = requestAnimationFrame(run);
+    } else {
+      // No animation frames in jsdom or a worker; stay synchronous there.
+      this.renderScheduled = false;
+      this.render();
+    }
+  }
+
+  /** Computes the rotated shape for the current pointer position. */
+  private rotatedFromPointer(
+    drag: Extract<DragState, { kind: 'rotate' }>,
+    point: Point,
+    event: PointerEvent | KeyboardEvent,
+  ): ShapeData {
+    const rotation = this.config.rotation;
+    const pointerAngle = angleOf(drag.pivot, point);
+    let delta = signedAngle(pointerAngle - drag.startAngle);
+
+    const modifier = this.isSnapModifierHeld(event);
+    const snapping = rotation.snapByDefault ? !modifier : modifier;
+    if (snapping) {
+      const target = drag.originalAngle + delta;
+      const snapped = snapAngleWithCardinals(
+        target,
+        rotation.snapIncrement ?? 15,
+        rotation.cardinalTolerance ?? 4,
+      );
+      delta = snapped - drag.originalAngle;
+    }
+
+    return rotateShape(drag.original, delta, drag.pivot) as ShapeData;
+  }
+
+  private isSnapModifierHeld(event: PointerEvent | KeyboardEvent): boolean {
+    switch (this.config.rotation.snapModifier) {
+      case 'alt':
+        return event.altKey;
+      case 'ctrl':
+        return event.ctrlKey;
+      case 'meta':
+        return event.metaKey;
+      default:
+        return event.shiftKey;
+    }
+  }
+
+  private selectedAnnotation(): ShapeData | undefined {
+    const id = this.store.selectedId;
+    return id ? this.store.get(id) : undefined;
+  }
+
+  /**
+   * Fans a store change out to the callbacks.
+   *
+   * The three original callbacks are kept for compatibility and only fire for
+   * committed changes; `onAnnotationChanged` carries everything including
+   * previews, distinguished by `transient`.
+   */
+  private emitChange(change: AnnotationChange): void {
+    this.callbacks.onAnnotationChanged?.(change);
+    if (change.transient) return;
+
+    if (change.kind === 'create' && change.after) {
+      this.callbacks.onAnnotationCreated?.(change.after);
+    } else if (change.kind === 'update' && change.after) {
+      this.callbacks.onAnnotationUpdated?.(change.after);
+    } else if (change.kind === 'delete') {
+      this.callbacks.onAnnotationDeleted?.(change.id);
+    }
   }
 
   private mount() {
@@ -319,7 +532,24 @@ export class OSDAnnotationEditor {
       this.svg.setPointerCapture?.(event.pointerId);
       this.select(hit.annotation.id);
       if (hit.kind === 'handle') {
+        if (hit.handle === 'rotate') {
+          if (!this.store.canRotate(hit.annotation.id)) return;
+          const pivot = shapeCenter(hit.annotation);
+          this.store.beginTransaction('rotate');
+          this.drag = {
+            kind: 'rotate',
+            id: hit.annotation.id,
+            original: structuredClone(hit.annotation),
+            pivot,
+            startAngle: angleOf(pivot, point),
+            originalAngle:
+              hit.annotation.type === 'oriented-rect' ? hit.annotation.geometry.angle : 0,
+          };
+          return;
+        }
+        if (!this.store.canEdit(hit.annotation.id)) return;
         if (hit.handle === 'vertex' && hit.vertexIndex != null) {
+          this.store.beginTransaction('vertex');
           this.drag = {
             kind: 'vertex',
             id: hit.annotation.id,
@@ -329,6 +559,7 @@ export class OSDAnnotationEditor {
           return;
         }
         if (hit.annotation.type === 'rect') {
+          this.store.beginTransaction('resize');
           this.drag = {
             kind: 'resize-rect',
             id: hit.annotation.id,
@@ -338,6 +569,8 @@ export class OSDAnnotationEditor {
         }
         return;
       }
+      if (!this.store.canEdit(hit.annotation.id)) return;
+      this.store.beginTransaction('move');
       this.drag = {
         kind: 'move',
         id: hit.annotation.id,
@@ -427,9 +660,11 @@ export class OSDAnnotationEditor {
         x: point.x - this.drag.start.x,
         y: point.y - this.drag.start.y,
       };
+      // translateShape, not translateAnnotation: the whole shape is clamped as
+      // a rigid body, so dragging against an edge cannot distort it.
       this.replaceAnnotation(
-        translateAnnotation(this.drag.original, delta, this.canvasSize),
-        false,
+        translateShape(this.drag.original, delta, this.canvasSize) as ShapeData,
+        'move',
       );
       return;
     }
@@ -444,14 +679,19 @@ export class OSDAnnotationEditor {
           this.config.minShapeSize,
           event.shiftKey,
         ),
-        false,
+        'resize',
       );
+      return;
+    }
+
+    if (this.drag.kind === 'rotate') {
+      this.replaceAnnotation(this.rotatedFromPointer(this.drag, point, event), 'rotate');
       return;
     }
 
     this.replaceAnnotation(
       updateVertex(this.drag.original, this.drag.vertexIndex, point, this.canvasSize),
-      false,
+      'vertex',
     );
   };
 
@@ -473,9 +713,32 @@ export class OSDAnnotationEditor {
       return;
     }
 
-    const updated = this.annotations.find((item) => item.id === drag.id);
-    if (updated) this.callbacks.onAnnotationUpdated?.(updated);
+    this.commitGesture(drag);
   };
+
+  /**
+   * Turns an in-flight gesture into one committed change.
+   *
+   * The previews were transient, so nothing has entered history yet. This
+   * replays the final geometry as a single non-transient update inside the open
+   * transaction, then closes it.
+   */
+  private commitGesture(drag: Exclude<DragState, { kind: 'draw' }>) {
+    const updated = this.store.get(drag.id);
+    if (!updated) {
+      this.store.abortTransaction();
+      return;
+    }
+
+    const changed = JSON.stringify(updated) !== JSON.stringify(drag.original);
+    if (!changed) {
+      this.store.abortTransaction();
+      return;
+    }
+
+    this.store.commitCurrent(drag.id, drag.original, gestureOperation(drag));
+    this.store.commitTransaction();
+  }
 
   private onDoubleClick = (event: MouseEvent) => {
     if (this.mode !== 'draw-polygon') return;
@@ -520,15 +783,15 @@ export class OSDAnnotationEditor {
       if (this.drag || this.polygonDraft.length > 0) {
         event.preventDefault();
         this.cancelDraft();
-      } else if (this.selectedId) {
+      } else if (this.store.selectedId) {
         event.preventDefault();
         this.select(null);
       }
       return;
     }
-    if ((event.key === 'Backspace' || event.key === 'Delete') && this.selectedId) {
+    if ((event.key === 'Backspace' || event.key === 'Delete') && this.store.selectedId) {
       event.preventDefault();
-      this.delete(this.selectedId);
+      this.delete(this.store.selectedId);
       return;
     }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
@@ -611,21 +874,22 @@ export class OSDAnnotationEditor {
   }
 
   private createAnnotation(annotation: ShapeData) {
-    this.annotations = [...this.annotations, annotation];
-    this.select(annotation.id);
-    this.callbacks.onAnnotationCreated?.(annotation);
-    this.render();
+    this.store.add(annotation, { operation: 'draw' });
+    this.store.select(annotation.id);
   }
 
-  private replaceAnnotation(annotation: ShapeData, emit: boolean) {
-    this.annotations = this.annotations.map((item) =>
-      item.id === annotation.id ? annotation : item,
-    );
-    if (emit) this.callbacks.onAnnotationUpdated?.(annotation);
-    this.render();
+  /**
+   * Applies an in-flight geometry change.
+   *
+   * Marked transient so it reaches the host as a preview but never enters
+   * history: a drag emitting a hundred samples must still be one undo step.
+   */
+  private replaceAnnotation(annotation: ShapeData, operation: ChangeOperation) {
+    this.store.update(annotation, { operation, transient: true });
   }
 
   private cancelDraft() {
+    if (this.drag && this.drag.kind !== 'draw') this.store.abortTransaction();
     this.drag = null;
     this.polygonDraft = [];
     this.lastPolygonClick = null;
@@ -674,7 +938,7 @@ export class OSDAnnotationEditor {
     this.draftLayer.replaceChildren();
     this.handleLayer.replaceChildren();
 
-    for (const annotation of this.annotations) {
+    for (const annotation of this.store.visible()) {
       this.renderAnnotation(annotation);
     }
     this.renderHandles();
@@ -687,7 +951,7 @@ export class OSDAnnotationEditor {
   }
 
   private renderAnnotation(annotation: ShapeData) {
-    const active = annotation.id === this.selectedId;
+    const active = annotation.id === this.store.selectedId;
     const style = resolveStyle(annotation, this.theme, this.style) as AnnotationStyle;
     let element: SVGElement;
     if (annotation.type === 'rect') {
@@ -720,6 +984,11 @@ export class OSDAnnotationEditor {
       element.setAttribute('y2', String(end.y));
       element.setAttribute('stroke-linecap', this.config.shapes.line?.lineCap ?? 'round');
       applyShapeStyle(element, style, { active, fill: false });
+    } else if (annotation.type === 'oriented-rect') {
+      const points = orientedRectCorners(annotation.geometry).map((point) => this.toElement(point));
+      element = createSvgElement('polygon');
+      element.setAttribute('points', points.map((point) => `${point.x},${point.y}`).join(' '));
+      applyShapeStyle(element, style, { active, fill: true });
     } else {
       const points = annotation.geometry.points.map((point) => this.toElement(point));
       element = createSvgElement(annotation.type === 'polygon' ? 'polygon' : 'polyline');
@@ -760,7 +1029,7 @@ export class OSDAnnotationEditor {
   }
 
   private renderHandles() {
-    const selected = this.annotations.find((item) => item.id === this.selectedId);
+    const selected = this.selectedAnnotation();
     if (!selected || this.mode !== 'select') return;
     const size = this.config.handleSize;
     if (selected.type === 'rect') {
@@ -785,7 +1054,9 @@ export class OSDAnnotationEditor {
         ? [selected.geometry.start, selected.geometry.end]
         : selected.type === 'point'
           ? [selected.geometry]
-          : selected.geometry.points;
+          : selected.type === 'oriented-rect'
+            ? orientedRectCorners(selected.geometry)
+            : selected.geometry.points;
     points.forEach((point, index) =>
       this.renderHandle(point, 'vertex', selected.id, size, index),
     );
@@ -881,15 +1152,16 @@ export class OSDAnnotationEditor {
   private hitTest(point: Point): Hit | null {
     const handle = this.hitHandle(point);
     if (handle) return handle;
-    for (let index = this.annotations.length - 1; index >= 0; index -= 1) {
-      const annotation = this.annotations[index];
+    const candidates = this.store.visible();
+    for (let index = candidates.length - 1; index >= 0; index -= 1) {
+      const annotation = candidates[index] as ShapeData;
       if (this.containsPoint(annotation, point)) return { kind: 'shape', annotation };
     }
     return null;
   }
 
   private hitHandle(point: Point): Hit | null {
-    const selected = this.annotations.find((item) => item.id === this.selectedId);
+    const selected = this.selectedAnnotation();
     if (!selected) return null;
     const tolerance = this.config.hitTolerance;
     if (selected.type === 'rect') {
@@ -916,7 +1188,9 @@ export class OSDAnnotationEditor {
         ? [selected.geometry.start, selected.geometry.end]
         : selected.type === 'point'
           ? [selected.geometry]
-          : selected.geometry.points;
+          : selected.type === 'oriented-rect'
+            ? orientedRectCorners(selected.geometry)
+            : selected.geometry.points;
     for (let index = 0; index < points.length; index += 1) {
       if (this.elementDistance(point, points[index]) <= tolerance) {
         return {
@@ -953,7 +1227,7 @@ export class OSDAnnotationEditor {
         return this.distanceToSegment(point, points[index - 1], candidate) <= tolerance;
       });
     }
-    return this.pointInPolygon(point, annotation.geometry.points);
+    return this.pointInPolygon(point, pointsFor(annotation));
   }
 
   private distanceToSegment(point: Point, start: Point, end: Point) {

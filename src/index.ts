@@ -1,5 +1,53 @@
 export { OSDAnnotationEditor } from './editor';
+export { AnnotationStore, DuplicateAnnotationError } from './store';
+export type {
+  InteractionPolicyResolver,
+  MutationOptions,
+  ReplacementMode,
+  SetAnnotationsOptions,
+  StoreOptions,
+} from './store';
+export { CommandHistory, invertEntry } from './history';
+export type {
+  AnnotationChange,
+  ChangeKind,
+  ChangeOperation,
+  HistoryEntry,
+  HistoryPolicy,
+  HistoryState,
+} from './history';
 export { elementToImage, hasAccurateProjection, imageToElement } from './coordinates';
+export {
+  angleOf,
+  applyMatrix,
+  boundsOfPoints,
+  centroid,
+  compose,
+  constrainShape,
+  IDENTITY,
+  multiply,
+  normalizeAngle,
+  orientedRectCorners,
+  outlineContainsPoint,
+  rotatePoint,
+  rotateShape,
+  rotationMatrix,
+  scaleMatrix,
+  scalePoint,
+  scaleShape,
+  shapeCenter,
+  signedAngle,
+  snapAngle,
+  snapAngleWithCardinals,
+  toAxisAlignedRect,
+  toOrientedRect,
+  toPolygonPoints,
+  transformedBounds,
+  transformShape,
+  translateShape,
+  translationMatrix,
+} from './transform';
+export type { Matrix } from './transform';
 export type { CoordinateOptions } from './coordinates';
 export type {
   AnnotationStyle,
@@ -11,12 +59,22 @@ export type {
   FreehandAnnotation,
   LineAnnotation,
   OSDAnnotationEditorOptions,
+  OrientedRectAnnotation,
+  OrientedRectGeometry,
   OSDLikeViewer,
   Point,
   PointAnnotation,
   PolygonAnnotation,
   RectAnnotation,
+  RectGeometry,
   ShapeData,
   ShapeGeometry,
   ShapeType,
+  AnnotationRenderer,
+  InteractionPolicy,
+  KeyboardConfig,
+  LabelPlacement,
+  LabelSpec,
+  RenderContext,
+  RotationConfig,
 } from './types';

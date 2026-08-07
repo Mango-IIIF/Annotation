@@ -23,6 +23,23 @@ export const DEFAULT_CONFIG: Required<
   polygonDoubleClickDelay: 500,
   polygonDoubleClickTolerance: 10,
   minShapeSize: { width: 8, height: 8 },
+  rotation: {
+    // Off by default: turning it on adds a handle to every selection, which
+    // would change the UI of every existing host without warning.
+    enabled: false,
+    handleDistance: 28,
+    snapIncrement: 15,
+    cardinalTolerance: 4,
+    snapModifier: 'shift',
+    snapByDefault: true,
+  },
+  keyboard: {
+    enabled: true,
+    moveStep: 1,
+    coarseMoveStep: 10,
+    resizeStep: 1,
+    rotateStep: 15,
+  },
   shapes: {
     rect: {
       borderRadius: 0,
