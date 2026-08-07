@@ -43,6 +43,6 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "@mango-iiif/w3c-parser": "^0.0.1"
+    "@mango-iiif/w3c-parser": "^1.0.0"
   }
 }
