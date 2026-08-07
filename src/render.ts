@@ -31,16 +31,40 @@ export function resolveStyle(
   };
 }
 
+/**
+ * Applies every declared style field.
+ *
+ * `fillOpacity` and `activeColor` were previously declared in
+ * `AnnotationStyle`, set in `DEFAULT_STYLE`, and then never read — selection
+ * was signalled only by adding one to the stroke width, and a host setting
+ * either field saw nothing happen.
+ */
 export function applyShapeStyle(
   element: SVGElement,
   style: AnnotationStyle,
   options?: { active?: boolean; fill?: boolean },
 ) {
+  const active = options?.active ?? false;
+  // The stroke stays the layer colour even when selected: that colour is how a
+  // reader tells which layer a shape belongs to, and losing it on selection
+  // would hide exactly the thing the layer palette exists to show. Selection is
+  // signalled by the heavier stroke and by `activeColor` on the handles.
   element.setAttribute('stroke', style.strokeColor);
-  element.setAttribute('stroke-width', String(options?.active ? style.strokeWidth + 1 : style.strokeWidth));
+  element.setAttribute(
+    'stroke-width',
+    String(active ? style.strokeWidth + 1 : style.strokeWidth),
+  );
   element.setAttribute('vector-effect', 'non-scaling-stroke');
   element.setAttribute('opacity', String(style.opacity));
-  element.setAttribute('fill', options?.fill === false ? 'none' : style.fillColor);
+
+  if (options?.fill === false) {
+    element.setAttribute('fill', 'none');
+    return;
+  }
+  element.setAttribute('fill', style.fillColor);
+  if (style.fillOpacity !== undefined) {
+    element.setAttribute('fill-opacity', String(style.fillOpacity));
+  }
 }
 
 /**

@@ -4,7 +4,6 @@ export const DEFAULT_STYLE: AnnotationStyle = {
   strokeColor: '#a78bfa',
   strokeWidth: 2,
   fillColor: 'rgba(167, 139, 250, 0.16)',
-  fillOpacity: 0.16,
   opacity: 1,
   activeColor: '#ffbf4d',
 };

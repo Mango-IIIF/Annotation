@@ -1,6 +1,7 @@
 import { DEFAULT_CONFIG, DEFAULT_STYLE, OSD_EVENTS } from './defaults';
 import {
   boundsFor,
+  clamp,
   orientedRectCorners,
   pointsFor,
   constrainPoint,
@@ -12,16 +13,22 @@ import {
   translateAnnotation,
   updateVertex,
 } from './geometry';
+import { hasAccurateProjection } from './coordinates';
 import { modeToShape, normalizeMode } from './modes';
 import { AnnotationStore, type SetAnnotationsOptions } from './store';
 import type { AnnotationChange, ChangeOperation } from './history';
 import {
   angleOf,
+  constrainShape,
+  normalizeAngle,
+  rotatePoint,
   rotateShape,
   shapeCenter,
   signedAngle,
   snapAngle,
   snapAngleWithCardinals,
+  boundsOfPoints,
+  toPolygonPoints,
   transformedBounds,
   translateShape,
 } from './transform';
@@ -33,7 +40,9 @@ import {
   resolveStyle,
 } from './render';
 import type {
+  AnnotationRenderer,
   AnnotationStyle,
+  RenderContext,
   AnnotationTheme,
   CanonicalEditorMode,
   CanvasSize,
@@ -108,6 +117,9 @@ export class OSDAnnotationEditor {
   private mode: CanonicalEditorMode;
   private store: AnnotationStore;
   private currentLayer?: string;
+  private readonly renderer: AnnotationRenderer | undefined;
+  private readonly accessibleLabel: ((annotation: ShapeData) => string) | undefined;
+  private focusedId: string | null = null;
   private style: Partial<AnnotationStyle>;
   private theme: AnnotationTheme;
   private config: Required<Omit<EditorConfig, 'shapes' | 'minShapeSize'>> & {
@@ -185,6 +197,8 @@ export class OSDAnnotationEditor {
       onModeChanged: options.onModeChanged,
       onAnnotationChanged: options.onAnnotationChanged,
     };
+    this.renderer = options.renderer;
+    this.accessibleLabel = options.accessibleLabel;
     this.keyboardTarget = options.keyboardTarget ?? window;
     this.root = document.createElement('div');
     this.root.className = CLASS_NAME;
@@ -201,8 +215,12 @@ export class OSDAnnotationEditor {
     this.svg.style.height = '100%';
     this.svg.style.overflow = 'visible';
     this.svg.style.pointerEvents = 'auto';
-    this.svg.setAttribute('role', 'application');
-    this.svg.setAttribute('aria-label', 'Annotation editor');
+    // Not role="application": that tells a screen reader to surrender all its
+    // own key handling, which is only honest for a widget that implements a
+    // complete keyboard model of its own. This is a group of button-like
+    // shapes, and `group` lets normal reading commands keep working.
+    this.svg.setAttribute('role', 'group');
+    this.svg.setAttribute('aria-label', 'Annotations');
 
     this.shapeLayer = createSvgElement('g');
     this.draftLayer = createSvgElement('g');
@@ -285,6 +303,77 @@ export class OSDAnnotationEditor {
     this.store.clearHistory();
   }
 
+  /**
+   * Rotates an annotation by `degrees` about a pivot, defaulting to its centre.
+   *
+   * One committed change, so it is one undo step whether it came from a drag,
+   * a keyboard press, or a host call.
+   */
+  rotate(id: string, degrees: number, options: { pivot?: Point; snap?: boolean } = {}): boolean {
+    const annotation = this.store.get(id);
+    if (!annotation || !this.store.canRotate(id)) return false;
+
+    const applied = options.snap
+      ? snapAngle(degrees, this.config.rotation.snapIncrement ?? 15)
+      : degrees;
+    const rotated = rotateShape(annotation, applied, options.pivot) as ShapeData;
+    return this.store.batch('rotate', () => {
+      this.store.update(rotated, { operation: 'rotate' });
+      return true;
+    });
+  }
+
+  /**
+   * Replaces an annotation's geometry outright.
+   *
+   * The entry point for an accessible coordinate form: a host can render number
+   * inputs and write exact values back without synthesising pointer events.
+   */
+  setGeometry(id: string, geometry: ShapeData['geometry'], options: { constrain?: boolean } = {}): boolean {
+    const annotation = this.store.get(id);
+    if (!annotation || !this.store.canEdit(id)) return false;
+
+    const next = { ...annotation, geometry } as ShapeData;
+    const constrained =
+      options.constrain === false ? next : (constrainShape(next, this.canvasSize) as ShapeData);
+    return this.store.batch('programmatic', () => {
+      this.store.update(constrained, { operation: 'programmatic' });
+      return true;
+    });
+  }
+
+  /** Moves an annotation by a delta in image pixels. */
+  nudge(id: string, delta: Point): boolean {
+    const annotation = this.store.get(id);
+    if (!annotation || !this.store.canEdit(id)) return false;
+
+    const moved = translateShape(annotation, delta, this.canvasSize) as ShapeData;
+    return this.store.batch('move', () => {
+      this.store.update(moved, { operation: 'move' });
+      return true;
+    });
+  }
+
+  /** Whether rotation-correct projection is available for this viewer. */
+  hasAccurateProjection(): boolean {
+    return hasAccurateProjection(this.viewer);
+  }
+
+  /**
+   * What this build supports.
+   *
+   * Lets a host feature-detect rather than sniff the version, which matters
+   * while capabilities are still being added.
+   */
+  static readonly capabilities = {
+    rotation: true,
+    history: true,
+    incrementalUpdates: true,
+    renderer: true,
+    keyboard: true,
+    orientedRect: true,
+  } as const;
+
   getAnnotations() {
     return this.store.all();
   }
@@ -357,9 +446,21 @@ export class OSDAnnotationEditor {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+
+    if (this.frameHandle !== null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(this.frameHandle);
+    }
+    this.frameHandle = null;
+    this.renderScheduled = false;
+
     for (const remove of this.removeHandlers) remove();
     this.removeHandlers = [];
     this.root.remove();
+
+    if (this.containerPosition !== null) {
+      this.viewer.container.style.position = this.containerPosition;
+      this.containerPosition = null;
+    }
   }
 
   /**
@@ -467,7 +568,12 @@ export class OSDAnnotationEditor {
   private mount() {
     const container = this.viewer.container;
     const position = getComputedStyle(container).position;
-    if (position === 'static') {
+    // An empty computed value means the property was never set, which is
+    // static. jsdom reports it that way, and so do some server-rendered trees.
+    if (position === 'static' || position === '') {
+      // Recorded so destroy can put it back. Leaving `relative` behind changes
+      // the host's layout for every element positioned against this container.
+      this.containerPosition = container.style.position;
       container.style.position = 'relative';
     }
     container.append(this.root);
@@ -482,6 +588,20 @@ export class OSDAnnotationEditor {
     this.listen(this.svg, 'click', this.onClick);
     this.listen(this.viewer.container, 'pointerdown', this.onContainerPointerDown);
     this.listenEvent(this.keyboardTarget, 'keydown', this.onKeyDown as EventListener);
+    // Focus is tracked separately from selection: a keyboard user tabs through
+    // shapes before choosing one, and the two states need different styling.
+    this.listenEvent(this.svg, 'focusin', ((event: FocusEvent) => {
+      const id = (event.target as SVGElement | null)?.dataset?.annotationId;
+      if (id && id !== this.focusedId) {
+        this.focusedId = id;
+        this.renderUnlessSuspended();
+      }
+    }) as EventListener);
+    this.listenEvent(this.svg, 'focusout', (() => {
+      if (this.focusedId === null) return;
+      this.focusedId = null;
+      this.renderUnlessSuspended();
+    }) as EventListener);
 
     for (const eventName of OSD_EVENTS) {
       const handler = () => this.render();
@@ -770,15 +890,25 @@ export class OSDAnnotationEditor {
     this.select(null);
   };
 
-  private onKeyDown = (event: KeyboardEvent) => {
+  /**
+   * Whether a key event belongs to something else.
+   *
+   * A shortcut swallowed from inside a host's text field is a real bug, and the
+   * previous check missed `select` and any region a host marks as editing.
+   */
+  private isEditingTarget(event: KeyboardEvent): boolean {
     const target = event.target as HTMLElement | null;
-    if (
-      target?.tagName === 'INPUT' ||
-      target?.tagName === 'TEXTAREA' ||
-      target?.isContentEditable
-    ) {
-      return;
-    }
+    if (!target) return false;
+    const tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (target.isContentEditable) return true;
+    // A host opts a whole subtree out with a data attribute.
+    return typeof target.closest === 'function' && target.closest('[data-annotation-keys="off"]') !== null;
+  }
+
+  private onKeyDown = (event: KeyboardEvent) => {
+    if (this.isEditingTarget(event)) return;
+
     if (event.key === 'Escape') {
       if (this.drag || this.polygonDraft.length > 0) {
         event.preventDefault();
@@ -789,24 +919,127 @@ export class OSDAnnotationEditor {
       }
       return;
     }
+
     if ((event.key === 'Backspace' || event.key === 'Delete') && this.store.selectedId) {
+      if (!this.store.canDelete(this.store.selectedId)) return;
       event.preventDefault();
       this.delete(this.store.selectedId);
       return;
     }
+
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+      // Inside a polygon draft, undo drops the last point rather than reaching
+      // into committed history — the draft is not committed yet.
       if (this.mode === 'draw-polygon' && this.polygonDraft.length > 0) {
         event.preventDefault();
         this.polygonDraft = this.polygonDraft.slice(0, -1);
         this.render();
+        return;
       }
+      event.preventDefault();
+      if (event.shiftKey) this.redo();
+      else this.undo();
       return;
     }
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
+      event.preventDefault();
+      this.redo();
+      return;
+    }
+
     if (event.key === 'Enter' && this.mode === 'draw-polygon' && this.polygonDraft.length >= 3) {
       event.preventDefault();
       this.commitPolygonDraft();
+      return;
     }
+
+    if (this.config.keyboard.enabled === false) return;
+    if (this.handleSelectionKeys(event)) return;
+    if (this.handleGeometryKeys(event)) return;
   };
+
+  /** Tab-like traversal of the annotation list from the keyboard. */
+  private handleSelectionKeys(event: KeyboardEvent): boolean {
+    if (event.key !== 'Tab' && event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return false;
+    // Arrow keys move geometry when something is selected; they only traverse
+    // when nothing is.
+    if (event.key !== 'Tab' && this.store.selectedId) return false;
+
+    const selectable = this.store.visible().filter((item) => this.store.canSelect(item.id));
+    if (selectable.length === 0) return false;
+
+    const current = selectable.findIndex((item) => item.id === this.store.selectedId);
+    const backwards = event.shiftKey || event.key === 'ArrowLeft';
+    const next = current === -1
+      ? (backwards ? selectable.length - 1 : 0)
+      : (current + (backwards ? -1 : 1) + selectable.length) % selectable.length;
+
+    const target = selectable[next];
+    if (!target) return false;
+
+    event.preventDefault();
+    this.focusedId = target.id;
+    this.select(target.id);
+    this.focusShape(target.id);
+    return true;
+  }
+
+  /** Arrow-key movement, resizing, and rotation for the selected shape. */
+  private handleGeometryKeys(event: KeyboardEvent): boolean {
+    const id = this.store.selectedId;
+    if (!id) return false;
+
+    const keyboard = this.config.keyboard;
+    const step = event.shiftKey ? (keyboard.coarseMoveStep ?? 10) : (keyboard.moveStep ?? 1);
+
+    const deltas: Record<string, Point> = {
+      ArrowUp: { x: 0, y: -step },
+      ArrowDown: { x: 0, y: step },
+      ArrowLeft: { x: -step, y: 0 },
+      ArrowRight: { x: step, y: 0 },
+    };
+
+    if (event.key === '[' || event.key === ']') {
+      if (!this.config.rotation.enabled || !this.store.canRotate(id)) return false;
+      event.preventDefault();
+      const amount = keyboard.rotateStep ?? 15;
+      this.rotate(id, event.key === ']' ? amount : -amount);
+      return true;
+    }
+
+    const delta = deltas[event.key];
+    if (!delta) return false;
+    if (!this.store.canEdit(id)) return false;
+
+    event.preventDefault();
+
+    // Alt turns the arrows into a resize rather than a move.
+    if (event.altKey) {
+      const annotation = this.store.get(id);
+      if (annotation?.type === 'rect') {
+        const resizeStep = keyboard.resizeStep ?? 1;
+        const rect = normalizeRect(annotation.geometry);
+        const widened = delta.x !== 0;
+        const next = {
+          ...rect,
+          w: widened ? Math.max(this.config.minShapeSize.width, rect.w + Math.sign(delta.x) * resizeStep) : rect.w,
+          h: widened ? rect.h : Math.max(this.config.minShapeSize.height, rect.h + Math.sign(delta.y) * resizeStep),
+        };
+        this.setGeometry(id, next);
+        return true;
+      }
+    }
+
+    this.nudge(id, delta);
+    return true;
+  }
+
+  /** Moves DOM focus to a shape, so a screen reader follows the selection. */
+  private focusShape(id: string) {
+    const element = this.shapeLayer.querySelector<SVGElement>(`[data-annotation-id="${CSS.escape(id)}"]`);
+    element?.focus?.();
+  }
 
   private commitDraw(drag: Extract<DragState, { kind: 'draw' }>, shiftKey: boolean) {
     const [start, rawEnd] = drag.points;
@@ -950,11 +1183,36 @@ export class OSDAnnotationEditor {
     }
   }
 
+  /** Builds the context every renderer hook receives. */
+  private renderContext(annotation: ShapeData): RenderContext {
+    const points = toPolygonPoints(annotation).map((point) => this.toElement(point));
+    return {
+      annotation,
+      style: resolveStyle(annotation, this.theme, this.style) as AnnotationStyle,
+      selected: annotation.id === this.store.selectedId,
+      focused: annotation.id === this.focusedId,
+      points,
+      bounds: boundsOfPoints(points),
+      viewportRotation: this.viewportRotation(),
+    };
+  }
+
+  private viewportRotation(): number {
+    const viewport = this.viewer.viewport as { getRotation?: (current?: boolean) => number };
+    const rotation = viewport?.getRotation?.(true);
+    return Number.isFinite(rotation) ? (rotation as number) : 0;
+  }
+
   private renderAnnotation(annotation: ShapeData) {
-    const active = annotation.id === this.store.selectedId;
-    const style = resolveStyle(annotation, this.theme, this.style) as AnnotationStyle;
+    const context = this.renderContext(annotation);
+    const { style, selected: active } = context;
+
+    const custom = this.renderer?.renderShape?.(context);
     let element: SVGElement;
-    if (annotation.type === 'rect') {
+
+    if (custom) {
+      element = custom;
+    } else if (annotation.type === 'rect') {
       const rect = normalizeRect(annotation.geometry);
       const start = this.toElement({ x: rect.x, y: rect.y });
       const end = this.toElement({ x: rect.x + rect.w, y: rect.y + rect.h });
@@ -967,13 +1225,22 @@ export class OSDAnnotationEditor {
       element.setAttribute('rx', String(radius));
       element.setAttribute('ry', String(radius));
       applyShapeStyle(element, style, { active, fill: true });
-    } else if (annotation.type === 'point') {
-      const point = this.toElement(annotation.geometry);
-      element = createSvgElement('circle');
-      element.setAttribute('cx', String(point.x));
-      element.setAttribute('cy', String(point.y));
-      element.setAttribute('r', '6');
+    } else if (annotation.type === 'oriented-rect') {
+      element = createSvgElement('polygon');
+      element.setAttribute('points', context.points.map((p) => `${p.x},${p.y}`).join(' '));
       applyShapeStyle(element, style, { active, fill: true });
+    } else if (annotation.type === 'point') {
+      const glyph = this.renderer?.renderPointGlyph?.(context);
+      if (glyph) {
+        element = glyph;
+      } else {
+        const point = this.toElement(annotation.geometry);
+        element = createSvgElement('circle');
+        element.setAttribute('cx', String(point.x));
+        element.setAttribute('cy', String(point.y));
+        element.setAttribute('r', '6');
+        applyShapeStyle(element, style, { active, fill: true });
+      }
     } else if (annotation.type === 'line') {
       const start = this.toElement(annotation.geometry.start);
       const end = this.toElement(annotation.geometry.end);
@@ -984,11 +1251,6 @@ export class OSDAnnotationEditor {
       element.setAttribute('y2', String(end.y));
       element.setAttribute('stroke-linecap', this.config.shapes.line?.lineCap ?? 'round');
       applyShapeStyle(element, style, { active, fill: false });
-    } else if (annotation.type === 'oriented-rect') {
-      const points = orientedRectCorners(annotation.geometry).map((point) => this.toElement(point));
-      element = createSvgElement('polygon');
-      element.setAttribute('points', points.map((point) => `${point.x},${point.y}`).join(' '));
-      applyShapeStyle(element, style, { active, fill: true });
     } else {
       const points = annotation.geometry.points.map((point) => this.toElement(point));
       element = createSvgElement(annotation.type === 'polygon' ? 'polygon' : 'polyline');
@@ -997,41 +1259,109 @@ export class OSDAnnotationEditor {
       element.setAttribute('stroke-linejoin', this.config.shapes.line?.lineJoin ?? 'round');
       applyShapeStyle(element, style, { active, fill: annotation.type === 'polygon' });
     }
-    element.dataset.annotationId = annotation.id;
-    element.style.pointerEvents = 'visiblePainted';
-    element.style.cursor = this.mode === 'select' ? 'pointer' : 'crosshair';
-    element.setAttribute('tabindex', '0');
-    element.setAttribute('role', 'button');
-    element.setAttribute('aria-label', annotation.label || annotation.text || 'Annotation');
-    this.shapeLayer.append(element);
 
-    if (annotation.label) {
-      this.renderLabel(annotation);
+    const policy = this.store.policyFor(annotation);
+    element.dataset.annotationId = annotation.id;
+    element.style.pointerEvents = policy.selectable ? 'visiblePainted' : 'none';
+    element.style.cursor = this.mode === 'select' ? (policy.editable ? 'move' : 'pointer') : 'crosshair';
+    element.setAttribute('tabindex', policy.selectable ? '0' : '-1');
+    element.setAttribute('role', 'button');
+    element.setAttribute('aria-label', this.accessibleLabelFor(annotation));
+    if (active) element.setAttribute('aria-pressed', 'true');
+    if (!policy.editable) element.setAttribute('aria-readonly', 'true');
+    if (context.focused) element.classList.add(`${CLASS_NAME}__shape--focused`);
+
+    const extraClass = this.renderer?.shapeClassName?.(context);
+    if (extraClass) element.setAttribute('class', extraClass);
+    const extraData = this.renderer?.shapeData?.(context);
+    if (extraData) {
+      for (const [key, value] of Object.entries(extraData)) element.dataset[key] = value;
     }
+
+    this.shapeLayer.append(element);
+    this.renderLabel(context);
   }
 
-  private renderLabel(annotation: ShapeData) {
-    const bounds = boundsFor(annotation);
-    const point = this.toElement({ x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h });
-    const text = createSvgElement('text');
-    text.textContent = annotation.label ?? '';
-    text.setAttribute('x', String(point.x));
-    text.setAttribute('y', String(point.y + 14));
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('font-size', '11');
-    text.setAttribute('fill', '#f8fafc');
-    text.setAttribute('paint-order', 'stroke');
-    text.setAttribute('stroke', 'rgba(15, 23, 42, 0.9)');
-    text.setAttribute('stroke-width', '3');
-    text.style.pointerEvents = 'none';
-    this.shapeLayer.append(text);
+  private accessibleLabelFor(annotation: ShapeData): string {
+    const supplied = this.accessibleLabel?.(annotation);
+    if (supplied) return supplied;
+    return annotation.label || annotation.text || `${annotation.type} annotation`;
+  }
+
+  /**
+   * Draws a label under host control.
+   *
+   * The font size is clamped between explicit bounds. Without a ceiling a large
+   * region produces headline-sized text, which is what drove Mango to observe
+   * and rewrite this package's SVG from outside.
+   */
+  private renderLabel(context: RenderContext) {
+    const spec = this.renderer?.label?.(context) ?? {};
+    if (spec.visible === false) return;
+
+    const text = spec.text ?? context.annotation.label;
+    if (!text) return;
+
+    const placement = spec.placement ?? 'below';
+    if (placement === 'none') return;
+
+    const bounds = context.bounds;
+    const minFontSize = spec.minFontSize ?? 11;
+    const maxFontSize = spec.maxFontSize ?? 24;
+    const fontSize = clamp(spec.fontSize ?? minFontSize, minFontSize, maxFontSize);
+
+    const anchorY =
+      placement === 'above'
+        ? bounds.y - fontSize * 0.4
+        : placement === 'center'
+          ? bounds.y + bounds.h / 2
+          : bounds.y + bounds.h + fontSize * 1.25;
+
+    const element = createSvgElement('text');
+    // A text node, never innerHTML: a label is host data, and injecting it as
+    // markup into the overlay would make this package an XSS vector.
+    element.textContent = text;
+    element.setAttribute('x', String(bounds.x + bounds.w / 2));
+    element.setAttribute('y', String(anchorY));
+    element.setAttribute('text-anchor', 'middle');
+    element.setAttribute('dominant-baseline', 'middle');
+    element.setAttribute('font-size', String(fontSize));
+    element.setAttribute('fill', '#f8fafc');
+    element.setAttribute('paint-order', 'stroke');
+    element.setAttribute('stroke', 'rgba(15, 23, 42, 0.9)');
+    element.setAttribute('stroke-width', String(Math.max(1, fontSize * 0.25)));
+    element.style.pointerEvents = 'none';
+    element.dataset.annotationId = context.annotation.id;
+    element.dataset.role = 'label';
+
+    // Upright by default. A label that follows a rotated shape is unreadable at
+    // most angles, so following is opt-in.
+    if (spec.orientation === 'shape' && context.annotation.type === 'oriented-rect') {
+      const centre = { x: bounds.x + bounds.w / 2, y: anchorY };
+      element.setAttribute(
+        'transform',
+        `rotate(${context.annotation.geometry.angle} ${centre.x} ${centre.y})`,
+      );
+    }
+
+    if (spec.className) element.setAttribute('class', spec.className);
+    if (spec.data) {
+      for (const [key, value] of Object.entries(spec.data)) element.dataset[key] = value;
+    }
+
+    this.shapeLayer.append(element);
   }
 
   private renderHandles() {
     const selected = this.selectedAnnotation();
     if (!selected || this.mode !== 'select') return;
+    if (!this.store.canEdit(selected.id)) return;
+
     const size = this.config.handleSize;
+    // The selected shape's handles carry `activeColor`, which is where the
+    // selected state shows without displacing the layer colour on the stroke.
+    const accent = (resolveStyle(selected, this.theme, this.style) as AnnotationStyle).activeColor;
+
     if (selected.type === 'rect') {
       const rect = normalizeRect(selected.geometry);
       const handles: Array<[string, Point]> = [
@@ -1045,10 +1375,12 @@ export class OSDAnnotationEditor {
         ['w', { x: rect.x, y: rect.y + rect.h / 2 }],
       ];
       for (const [handle, point] of handles) {
-        this.renderHandle(point, handle, selected.id, size);
+        this.renderHandle(point, handle, selected.id, size, undefined, accent);
       }
+      this.renderRotationHandle(selected, accent);
       return;
     }
+
     const points =
       selected.type === 'line'
         ? [selected.geometry.start, selected.geometry.end]
@@ -1058,8 +1390,70 @@ export class OSDAnnotationEditor {
             ? orientedRectCorners(selected.geometry)
             : selected.geometry.points;
     points.forEach((point, index) =>
-      this.renderHandle(point, 'vertex', selected.id, size, index),
+      this.renderHandle(point, 'vertex', selected.id, size, index, accent),
     );
+    this.renderRotationHandle(selected, accent);
+  }
+
+  /**
+   * Draws the rotation handle above the shape.
+   *
+   * Positioned in element space at a fixed screen distance, so it stays the
+   * same size and the same reach at every zoom level. Off unless the host
+   * enables rotation, because adding a handle to every selection would change
+   * the UI of every existing consumer.
+   */
+  private renderRotationHandle(selected: ShapeData, accent: string) {
+    if (!this.config.rotation.enabled) return;
+    if (selected.type === 'point') return;
+    if (!this.store.canRotate(selected.id)) return;
+
+    const anchor = this.rotationHandlePosition(selected);
+    if (!anchor) return;
+
+    const centre = this.toElement(shapeCenter(selected));
+    const connector = createSvgElement('line');
+    connector.setAttribute('x1', String(centre.x));
+    connector.setAttribute('y1', String(centre.y));
+    connector.setAttribute('x2', String(anchor.x));
+    connector.setAttribute('y2', String(anchor.y));
+    connector.setAttribute('stroke', accent);
+    connector.setAttribute('stroke-width', '1');
+    connector.setAttribute('vector-effect', 'non-scaling-stroke');
+    connector.style.pointerEvents = 'none';
+    this.handleLayer.append(connector);
+
+    const element = createSvgElement('circle');
+    const radius = Math.max(5, this.config.handleSize / 2);
+    element.setAttribute('cx', String(anchor.x));
+    element.setAttribute('cy', String(anchor.y));
+    element.setAttribute('r', String(radius));
+    element.setAttribute('fill', accent);
+    element.setAttribute('stroke', this.config.handleStrokeColor);
+    element.setAttribute('stroke-width', '1.5');
+    element.setAttribute('vector-effect', 'non-scaling-stroke');
+    element.dataset.annotationId = selected.id;
+    element.dataset.handle = 'rotate';
+    element.setAttribute('role', 'button');
+    element.setAttribute('aria-label', 'Rotate annotation');
+    element.style.pointerEvents = 'all';
+    element.style.cursor = 'grab';
+    this.handleLayer.append(element);
+  }
+
+  /** Rotation handle position, in element space, above the shape's top edge. */
+  private rotationHandlePosition(selected: ShapeData): Point | null {
+    const projected = toPolygonPoints(selected).map((point) => this.toElement(point));
+    if (projected.length === 0) return null;
+
+    const bounds = boundsOfPoints(projected);
+    const distance = this.config.rotation.handleDistance ?? 28;
+    const centre = { x: bounds.x + bounds.w / 2, y: bounds.y };
+
+    // Offset along the viewport's own up direction, so the handle sits above
+    // the shape as the reader sees it even when the whole canvas is rotated.
+    const up = -this.viewportRotation();
+    return rotatePoint({ x: centre.x, y: centre.y - distance }, up, centre);
   }
 
   private renderHandle(
@@ -1068,6 +1462,7 @@ export class OSDAnnotationEditor {
     id: string,
     size: number,
     vertexIndex?: number,
+    accent?: string,
   ) {
     const projected = this.toElement(point);
     const element = createSvgElement('rect');
@@ -1076,7 +1471,7 @@ export class OSDAnnotationEditor {
     element.setAttribute('width', String(size));
     element.setAttribute('height', String(size));
     element.setAttribute('rx', '2');
-    element.setAttribute('fill', this.config.handleColor);
+    element.setAttribute('fill', accent ?? this.config.handleColor);
     element.setAttribute('stroke', this.config.handleStrokeColor);
     element.setAttribute('stroke-width', '1.5');
     element.setAttribute('vector-effect', 'non-scaling-stroke');
@@ -1084,8 +1479,26 @@ export class OSDAnnotationEditor {
     element.dataset.handle = handle;
     if (vertexIndex != null) element.dataset.vertexIndex = String(vertexIndex);
     element.style.pointerEvents = 'all';
-    element.style.cursor = handle === 'vertex' ? 'move' : `${handle}-resize`;
+    element.style.cursor = handle === 'vertex' ? 'move' : this.resizeCursor(handle);
     this.handleLayer.append(element);
+  }
+
+  /**
+   * Cursor for a resize handle, turned to follow the viewport.
+   *
+   * A handle labelled `n` is not pointing north once the canvas is rotated, and
+   * a cursor that disagrees with the direction the handle actually moves is
+   * worse than no cursor at all.
+   */
+  private resizeCursor(handle: string): string {
+    const directions = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
+    const index = directions.indexOf(handle);
+    if (index === -1) return 'move';
+
+    const rotation = normalizeAngle(this.viewportRotation());
+    const steps = Math.round(rotation / 45);
+    const rotated = directions[(index + steps) % directions.length] as string;
+    return `${rotated}-resize`;
   }
 
   private renderDraft(pointer?: Point) {
@@ -1164,6 +1577,15 @@ export class OSDAnnotationEditor {
     const selected = this.selectedAnnotation();
     if (!selected) return null;
     const tolerance = this.config.hitTolerance;
+
+    // The rotation handle sits outside the shape, so it is tested first — a
+    // vertex handle underneath would otherwise win by proximity.
+    if (this.config.rotation.enabled && selected.type !== 'point') {
+      const anchor = this.rotationHandlePosition(selected);
+      if (anchor && distance(this.toElement(point), anchor) <= tolerance + 2) {
+        return { kind: 'handle', annotation: selected, handle: 'rotate' };
+      }
+    }
     if (selected.type === 'rect') {
       const rect = normalizeRect(selected.geometry);
       const handles: Array<[string, Point]> = [

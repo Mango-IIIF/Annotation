@@ -142,9 +142,17 @@ export type ShapeData =
 export type AnnotationStyle = {
   strokeColor: string;
   strokeWidth: number;
+  /** May carry its own alpha, in which case leave `fillOpacity` unset. */
   fillColor: string;
-  fillOpacity: number;
+  /**
+   * Separate fill alpha.
+   *
+   * Optional and unset by default, because `fillColor` conventionally carries
+   * its own alpha and emitting both would multiply them.
+   */
+  fillOpacity?: number;
   opacity: number;
+  /** Accent for the selected state. Applied to that shape's handles. */
   activeColor: string;
 };
 
