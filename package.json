@@ -1,6 +1,6 @@
 {
   "name": "@mango-iiif/annotation",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Framework-agnostic OpenSeadragon annotation editor.",
   "license": "MIT",
   "repository": {
@@ -9,7 +9,8 @@
   },
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "API.md"
   ],
   "publishConfig": {
     "access": "public",
@@ -22,7 +23,9 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./style.css": "./dist/annotation.css",
+    "./annotorious.css": "./dist/annotorious.css"
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -34,18 +37,27 @@
     "typecheck": "tsc --noEmit",
     "pack:check": "npm pack --dry-run"
   },
+  "dependencies": {
+    "@annotorious/plugin-magnetic-outline": "0.4.1",
+    "@annotorious/plugin-tools": "1.6.0",
+    "@lucide/svelte": "^1.25.0"
+  },
   "devDependencies": {
+    "@annotorious/openseadragon": "3.9.5",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@mango-iiif/w3c-parser": "^1.0.0",
     "@types/node": "^24.1.0",
-    "@types/openseadragon": "^5.0.2",
     "jsdom": "^27.0.1",
-    "openseadragon": "^5.0.1",
+    "openseadragon": "^6.1.1",
     "typescript": "~5.9.3",
     "vite": "^8.0.16",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "svelte": "^5.43.8"
   },
   "peerDependencies": {
-    "openseadragon": ">=4.0.0"
+    "@annotorious/openseadragon": "^3.9.5",
+    "openseadragon": ">=6.0.0",
+    "svelte": "^5.0.0"
   },
   "peerDependenciesMeta": {
     "openseadragon": {
