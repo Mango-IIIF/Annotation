@@ -1,4 +1,26 @@
-export { OSDAnnotationEditor } from './editor';
+export { AnnotoriousEditor } from './annotorious-editor';
+export type {
+  AnnotationTool,
+  AnnotoriousEditorEvents,
+  AnnotoriousEditorOptions,
+} from './annotorious-editor';
+export { default as AnnotationSidebar } from './sidebar/Sidebar.svelte';
+export { default as AnnotationToolbar } from './toolbar/Toolbar.svelte';
+export type { SamCommand, SamState, Tool } from './toolbar/types';
+export type {
+  Card as AnnotationSidebarCard,
+  IdentifySnippetContext,
+  SidebarSection,
+  SidebarVisibility,
+} from './sidebar/types';
+export { emptyDraft, type Draft, type Intent } from './annotations/intents';
+export type { Annotation as SidebarAnnotation, Scope } from './annotations/types';
+export type { AuthorityProvider, AuthorityEntity } from './authorities/types';
+export { getLocale, locale, setLocale, translate } from './core/i18n';
+export type {
+  ImageAnnotation,
+  OpenSeadragonAnnotator,
+} from '@annotorious/openseadragon';
 export {
   bakeRotation,
   basePoints,
@@ -30,14 +52,6 @@ export type {
   HistoryState,
 } from './history';
 export {
-  elementToImage,
-  hasAccurateProjection,
-  imageToElement,
-  matrixToTransform,
-  projectionMatrix,
-} from './coordinates';
-export type { ProjectionMatrix } from './coordinates';
-export {
   angleOf,
   applyMatrix,
   boundsOfPoints,
@@ -67,18 +81,11 @@ export {
   translationMatrix,
 } from './transform';
 export type { Matrix } from './transform';
-export type { CoordinateOptions } from './coordinates';
 export type {
   AnnotationStyle,
-  AnnotationTheme,
   CanvasSize,
-  CanonicalEditorMode,
-  EditorConfig,
-  EditorMode,
   FreehandAnnotation,
   LineAnnotation,
-  OSDAnnotationEditorOptions,
-  OSDLikeViewer,
   Point,
   PointAnnotation,
   PolygonAnnotation,
@@ -87,11 +94,4 @@ export type {
   ShapeData,
   ShapeGeometry,
   ShapeType,
-  AnnotationRenderer,
-  InteractionPolicy,
-  KeyboardConfig,
-  LabelPlacement,
-  LabelSpec,
-  RenderContext,
-  RotationConfig,
 } from './types';

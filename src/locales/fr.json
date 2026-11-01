@@ -1,0 +1,269 @@
+{
+  "about": {
+    "description": "Mango est un visualiseur à zoom profond open source, conforme à IIIF et à W3C Annotation, doublé d'une suite de création d'histoires interactives, conçu pour explorer manuscrits, œuvres d'art et médias spatiaux en haute résolution."
+  },
+  "annotate": {
+    "stage": "Zone d'annotation",
+    "loading": "Chargement de l'élément…",
+    "loadError": "L'élément n'a pas pu être chargé.",
+    "warnings": {
+      "invalidConfig": "Configuration de l'éditeur d'annotations non valide :"
+    },
+    "export": {
+      "button": "Télécharger les annotations ({count})",
+      "ready": "IIIF prêt à publier téléchargé.",
+      "draft": "Brouillon téléchargé. Attribuez des identifiants HTTP(S) à la page et aux annotations avant publication."
+    },
+    "sidebar": {
+      "label": "Annoter",
+      "editing": "Modification de l'annotation",
+      "language": "Langue",
+      "hasText": "Contient du texte",
+      "save": "Enregistrer l'annotation",
+      "update": "Mettre à jour l'annotation",
+      "cancel": "Annuler la modification",
+      "json": "Ce qui est enregistré"
+    },
+    "scope": {
+      "label": "De quoi s'agit-il ?",
+      "region": "Une zone",
+      "canvas": "Cette image",
+      "short": {
+        "region": "Zone",
+        "canvas": "Image entière",
+        "manifest": "Élément entier",
+        "time": "Moment"
+      }
+    },
+    "region": {
+      "none": "Dessinez un cadre sur l'image, ou cliquez sur une forme.",
+      "drawing": "Cliquez sur l'image pour commencer, puis à nouveau pour terminer.",
+      "selected": "Zone sélectionnée, {w} × {h} px",
+      "count": "annotations : {count}",
+      "draw": "Dessiner un cadre",
+      "redraw": "Redessiner",
+      "delete": "Supprimer la forme"
+    },
+    "time": {
+      "start": "Début (secondes)",
+      "end": "Fin (facultatif)",
+      "useCurrent": "Utiliser le temps actuel"
+    },
+    "intents": {
+      "question": "Que souhaitez-vous faire ?",
+      "choose": "Choisissez une option ci-dessus pour voir les champs nécessaires.",
+      "note": {
+        "label": "Ajouter une note",
+        "hint": {
+          "image": "Partagez vos réflexions, souvenirs ou informations sur cette partie de l'image.",
+          "av": "Partagez vos réflexions, souvenirs ou informations sur ce moment."
+        }
+      },
+      "transcribe": {
+        "label": "Transcrire",
+        "hint": {
+          "image": "Écrivez le texte exactement tel qu'il apparaît dans cette zone. Il pourra ensuite être recherché.",
+          "av": "Écrivez exactement ce qui est dit. Le texte pourra être recherché et affiché en sous-titres."
+        }
+      },
+      "tag": {
+        "label": "Étiqueter",
+        "hint": {
+          "image": "Ajoutez quelques mots-clés pour aider à retrouver ceci.",
+          "av": "Ajoutez quelques mots-clés pour aider à retrouver ceci."
+        }
+      },
+      "identify": {
+        "label": "Identifier",
+        "hint": {
+          "image": "Indiquez précisément qui, quoi ou où c'est, à l'aide d'une référence partagée comme Wikidata.",
+          "av": "Indiquez précisément qui, quoi ou où c'est, à l'aide d'une référence partagée comme Wikidata."
+        }
+      },
+      "highlight": {
+        "label": "Signaler",
+        "hint": {
+          "image": "Signalez que cette partie de l'image mérite le coup d'œil. Aucun texte nécessaire.",
+          "av": "Signalez que ce moment mérite d'être écouté. Aucun texte nécessaire."
+        }
+      },
+      "link": {
+        "label": "Lier",
+        "hint": {
+          "image": "Reliez ceci à un autre élément de la collection.",
+          "av": "Reliez ce moment à un autre élément ou enregistrement de la collection."
+        }
+      }
+    },
+    "fields": {
+      "optional": "facultatif",
+      "title": "Titre",
+      "titlePlaceholder": "Un titre court",
+      "note": "Votre note",
+      "notePlaceholder": "Que montre ou nous apprend ceci ?",
+      "transcription": "Ce qui est dit ou écrit",
+      "transcriptionPlaceholder": "Saisissez-le exactement tel que vous l'entendez ou le voyez",
+      "tags": "Mots-clés",
+      "tagsPlaceholder": "Séparez par des virgules",
+      "why": "Pourquoi c'est important",
+      "whyPlaceholder": "p. ex. Première mention de la grève",
+      "linkUrl": "Élément ou enregistrement lié",
+      "linkUrlPlaceholder": "Collez un lien",
+      "linkFrom": "De (secondes)",
+      "linkTo": "À (facultatif)"
+    },
+    "identify": {
+      "question": "Qui, quoi ou où est-ce ?",
+      "source": "Rechercher dans",
+      "search": "Rechercher dans {provider}",
+      "placeholder": "Trouver une personne, un lieu ou un sujet",
+      "searching": "Recherche dans {provider}…",
+      "noResults": "Aucun résultat.",
+      "linked": "Liés",
+      "remove": "Retirer {label}",
+      "none": "Aucune source de référence n'est configurée."
+    },
+    "ai": {
+      "label": "Suggestions de l'IA",
+      "flag": "IA",
+      "loading": "Analyse de l'image…",
+      "suggest": {
+        "region": "Suggérer avec l'IA (cette zone)",
+        "image": "Suggérer avec l'IA (image entière)"
+      },
+      "explain": {
+        "region": "Envoie cette zone pour obtenir des suggestions. Elles remplissent seulement le formulaire ; vérifiez-les avant d'enregistrer.",
+        "image": "Envoie cette image pour obtenir des suggestions. Elles remplissent seulement le formulaire ; vérifiez-les avant d'enregistrer."
+      },
+      "fields": {
+        "label": "Titre",
+        "note": "Description",
+        "transcription": "Transcription",
+        "tags": "Mots-clés"
+      },
+      "inForm": "Dans le formulaire",
+      "use": "Utiliser",
+      "link": "Lier",
+      "linked": "Lié",
+      "suggestedBy": "Suggéré par {model}"
+    },
+    "problems": {
+      "noIntent": "Choisissez ce que vous souhaitez faire.",
+      "noText": "Écrivez quelque chose avant d'enregistrer.",
+      "noTags": "Ajoutez au moins un mot-clé.",
+      "noEntity": "Choisissez qui, quoi ou où c'est.",
+      "badUrl": "Saisissez une adresse web commençant par http:// ou https://.",
+      "noRegion": "Dessinez ou sélectionnez d'abord une forme sur l'image, ou annotez l'image entière.",
+      "time": {
+        "start": "Saisissez un temps de début de zéro seconde ou plus.",
+        "startAfterEnd": "Le début doit précéder la fin de l'enregistrement.",
+        "end": "La fin doit suivre le début et rester dans l'enregistrement."
+      }
+    },
+    "cards": {
+      "heading": "Vos annotations ({count})",
+      "empty": {
+        "image": "Vos annotations sur cette image et cet élément apparaîtront ici.",
+        "av": "Vos annotations sur cet enregistrement apparaîtront ici."
+      },
+      "show": "Afficher",
+      "jump": "Aller",
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "table": {
+      "heading": "Toutes les annotations ({count})",
+      "show": "Afficher la liste des annotations",
+      "hide": "Masquer la liste des annotations",
+      "search": "Rechercher des annotations",
+      "filter": "Filtrer par origine",
+      "sortBy": "Trier par",
+      "origin": {
+        "all": "Toutes",
+        "mine": "Les vôtres",
+        "source": "De l'élément"
+      },
+      "sort": {
+        "document": "Ordre du document",
+        "title": "Titre",
+        "motivation": "Type",
+        "where": "Emplacement"
+      },
+      "columns": {
+        "title": "Titre",
+        "text": "Texte",
+        "motivation": "Type",
+        "where": "Emplacement",
+        "origin": "Origine"
+      },
+      "select": "Sélectionner {annotation}",
+      "count": "{shown} sur {total} affichées",
+      "canvasN": "Image {n}"
+    },
+    "gallery": {
+      "label": "Pages",
+      "show": "Afficher les pages",
+      "hide": "Masquer les pages",
+      "page": "Page {n} : {label}",
+      "annotated": "Contient vos annotations"
+    },
+    "settings": {
+      "label": "Paramètres",
+      "colour": "Couleur de la visionneuse"
+    },
+    "tools": {
+      "label": "Outils de dessin",
+      "select": "Sélectionner et déplacer",
+      "rectangle": "Rectangle",
+      "polygon": "Polygone (cliquez des points, double-cliquez pour terminer)",
+      "ellipse": "Ellipse",
+      "path": "Main levée",
+      "line": "Ligne",
+      "smart": "Outils intelligents",
+      "closeSmart": "Fermer les outils intelligents",
+      "intelligent-scissors": "Ciseaux intelligents",
+      "magnetic-cursor": "Accroche aux bords",
+      "smart-select": "Sélection automatique",
+      "enable": "Activer {tool}",
+      "hints": {
+        "intelligent-scissors": "Cliquez pour commencer, suivez le bord, puis cliquez pour placer des points.",
+        "intelligent-scissorsMore": "Double-cliquez pour terminer. Utile pour les contours courbes et complexes.",
+        "magnetic-cursor": "Le curseur s'accroche aux bords proches pendant le dessin.",
+        "magnetic-cursorMore": "Utile pour les contours nets et contrastés."
+      }
+    },
+    "sam": {
+      "unsupported": "La sélection automatique nécessite WebGPU. Utilisez Chrome ou Edge sur un ordinateur de bureau.",
+      "error": "La sélection automatique n'a pas pu démarrer : {message}",
+      "loading": "Chargement du modèle de sélection…",
+      "download": "Téléchargement du modèle",
+      "cached": "Le modèle est conservé dans votre navigateur après le premier téléchargement.",
+      "instructions": "Survolez pour un aperçu. Cliquez sur un objet, puis ajoutez ou retirez des points pour affiner son contour.",
+      "mode": "Mode de sélection automatique",
+      "add": "Sélectionner un objet",
+      "remove": "Retirer une zone",
+      "busy": "Analyse de la vue…",
+      "shift": "Maj-clic retire aussi une zone.",
+      "paused": "Sélection en pause. Faites glisser l'image pour la déplacer.",
+      "done": "Terminer",
+      "reset": "Réinitialiser"
+    },
+    "av": {
+      "recording": "Enregistrement",
+      "recordingN": "Enregistrement {n}",
+      "recordingKind": "Histoire orale",
+      "position": "Position de lecture",
+      "loadError": "L'enregistrement n'a pas pu être chargé. Le serveur source est peut-être indisponible. Vous pouvez toujours saisir les temps à la main.",
+      "details": "Détails de l'enregistrement",
+      "tabs": {
+        "transcript": "Transcription",
+        "chapters": "Chapitres",
+        "annotations": "Annotations"
+      },
+      "findInTranscript": "Rechercher dans la transcription",
+      "noTranscript": "Aucun passage de transcription.",
+      "noChapters": "Aucun chapitre disponible.",
+      "noAnnotations": "Aucune annotation de l'élément."
+    }
+  }
+}

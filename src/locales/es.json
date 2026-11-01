@@ -1,0 +1,269 @@
+{
+  "about": {
+    "description": "Mango es un visor de zoom profundo de código abierto, compatible con IIIF y con W3C Annotation, y un conjunto de herramientas de creación de historias interactivas, diseñado para explorar manuscritos, obras de arte y medios espaciales de alta resolución."
+  },
+  "annotate": {
+    "stage": "Área de anotación",
+    "loading": "Cargando el elemento…",
+    "loadError": "No se pudo cargar el elemento.",
+    "warnings": {
+      "invalidConfig": "Configuración del editor de anotaciones no válida:"
+    },
+    "export": {
+      "button": "Descargar anotaciones ({count})",
+      "ready": "IIIF listo para publicar descargado.",
+      "draft": "Borrador descargado. Asigne identificadores HTTP(S) a la página y a las anotaciones antes de publicar."
+    },
+    "sidebar": {
+      "label": "Anotar",
+      "editing": "Editando la anotación",
+      "language": "Idioma",
+      "hasText": "Tiene texto",
+      "save": "Guardar anotación",
+      "update": "Actualizar anotación",
+      "cancel": "Cancelar edición",
+      "json": "Lo que se guarda"
+    },
+    "scope": {
+      "label": "¿Sobre qué es?",
+      "region": "Una zona",
+      "canvas": "Esta imagen",
+      "short": {
+        "region": "Zona",
+        "canvas": "Imagen completa",
+        "manifest": "Elemento completo",
+        "time": "Momento"
+      }
+    },
+    "region": {
+      "none": "Dibuje un recuadro en la imagen o haga clic en una forma.",
+      "drawing": "Haga clic en la imagen para empezar y otra vez para terminar.",
+      "selected": "Zona seleccionada, {w} × {h} px",
+      "count": "anotaciones: {count}",
+      "draw": "Dibujar un recuadro",
+      "redraw": "Redibujar",
+      "delete": "Eliminar forma"
+    },
+    "time": {
+      "start": "Inicio (segundos)",
+      "end": "Fin (opcional)",
+      "useCurrent": "Usar el tiempo actual"
+    },
+    "intents": {
+      "question": "¿Qué le gustaría hacer?",
+      "choose": "Elija una opción para ver los campos necesarios.",
+      "note": {
+        "label": "Añadir una nota",
+        "hint": {
+          "image": "Comparta sus ideas, recuerdos o contexto sobre esta parte de la imagen.",
+          "av": "Comparta sus ideas, recuerdos o contexto sobre este momento."
+        }
+      },
+      "transcribe": {
+        "label": "Transcribir",
+        "hint": {
+          "image": "Escriba el texto exactamente como aparece en esta zona. Así se podrá buscar.",
+          "av": "Escriba exactamente lo que se dice. Se podrá buscar y mostrar como subtítulos."
+        }
+      },
+      "tag": {
+        "label": "Etiquetar",
+        "hint": {
+          "image": "Añada algunas palabras clave para ayudar a encontrar esto.",
+          "av": "Añada algunas palabras clave para ayudar a encontrar esto."
+        }
+      },
+      "identify": {
+        "label": "Identificar",
+        "hint": {
+          "image": "Indique exactamente quién, qué o dónde es, con una referencia compartida como Wikidata.",
+          "av": "Indique exactamente quién, qué o dónde es, con una referencia compartida como Wikidata."
+        }
+      },
+      "highlight": {
+        "label": "Destacar",
+        "hint": {
+          "image": "Marque esta parte de la imagen como digna de ver. No hace falta texto.",
+          "av": "Marque este momento como digno de escuchar. No hace falta texto."
+        }
+      },
+      "link": {
+        "label": "Enlazar",
+        "hint": {
+          "image": "Conecte esto con otro elemento de la colección.",
+          "av": "Conecte este momento con otro elemento o grabación de la colección."
+        }
+      }
+    },
+    "fields": {
+      "optional": "opcional",
+      "title": "Título",
+      "titlePlaceholder": "Un título breve",
+      "note": "Su nota",
+      "notePlaceholder": "¿Qué muestra o nos cuenta esto?",
+      "transcription": "Lo que se dice o se escribe",
+      "transcriptionPlaceholder": "Escríbalo exactamente como lo oye o lo ve",
+      "tags": "Palabras clave",
+      "tagsPlaceholder": "Separe con comas",
+      "why": "Por qué importa",
+      "whyPlaceholder": "p. ej. Primera mención de la huelga",
+      "linkUrl": "Elemento o grabación relacionados",
+      "linkUrlPlaceholder": "Pegue un enlace",
+      "linkFrom": "Desde (segundos)",
+      "linkTo": "Hasta (opcional)"
+    },
+    "identify": {
+      "question": "¿Quién, qué o dónde es esto?",
+      "source": "Buscar en",
+      "search": "Buscar en {provider}",
+      "placeholder": "Buscar una persona, lugar o tema",
+      "searching": "Buscando en {provider}…",
+      "noResults": "Sin resultados.",
+      "linked": "Enlazados",
+      "remove": "Quitar {label}",
+      "none": "No hay fuentes de referencia configuradas."
+    },
+    "ai": {
+      "label": "Sugerencias de IA",
+      "flag": "IA",
+      "loading": "Analizando la imagen…",
+      "suggest": {
+        "region": "Sugerir con IA (esta zona)",
+        "image": "Sugerir con IA (imagen completa)"
+      },
+      "explain": {
+        "region": "Envía esta zona para obtener sugerencias. Solo rellenan el formulario; revíselas antes de guardar.",
+        "image": "Envía esta imagen para obtener sugerencias. Solo rellenan el formulario; revíselas antes de guardar."
+      },
+      "fields": {
+        "label": "Título",
+        "note": "Descripción",
+        "transcription": "Transcripción",
+        "tags": "Palabras clave"
+      },
+      "inForm": "En el formulario",
+      "use": "Usar",
+      "link": "Enlazar",
+      "linked": "Enlazado",
+      "suggestedBy": "Sugerido por {model}"
+    },
+    "problems": {
+      "noIntent": "Elija qué le gustaría hacer.",
+      "noText": "Escriba algo antes de guardar.",
+      "noTags": "Añada al menos una palabra clave.",
+      "noEntity": "Elija quién, qué o dónde es.",
+      "badUrl": "Introduzca una dirección web que empiece por http:// o https://.",
+      "noRegion": "Primero dibuje o seleccione una forma en la imagen, o anote la imagen completa.",
+      "time": {
+        "start": "Introduzca un inicio de cero segundos o más.",
+        "startAfterEnd": "El inicio debe ser anterior al final de la grabación.",
+        "end": "El final debe ser posterior al inicio y estar dentro de la grabación."
+      }
+    },
+    "cards": {
+      "heading": "Sus anotaciones ({count})",
+      "empty": {
+        "image": "Sus anotaciones sobre esta imagen y este elemento aparecerán aquí.",
+        "av": "Sus anotaciones sobre esta grabación aparecerán aquí."
+      },
+      "show": "Mostrar",
+      "jump": "Ir",
+      "edit": "Editar",
+      "delete": "Eliminar"
+    },
+    "table": {
+      "heading": "Todas las anotaciones ({count})",
+      "show": "Mostrar la lista de anotaciones",
+      "hide": "Ocultar la lista de anotaciones",
+      "search": "Buscar anotaciones",
+      "filter": "Filtrar por origen",
+      "sortBy": "Ordenar por",
+      "origin": {
+        "all": "Todas",
+        "mine": "Suyas",
+        "source": "Del elemento"
+      },
+      "sort": {
+        "document": "Orden del documento",
+        "title": "Título",
+        "motivation": "Tipo",
+        "where": "Ubicación"
+      },
+      "columns": {
+        "title": "Título",
+        "text": "Texto",
+        "motivation": "Tipo",
+        "where": "Ubicación",
+        "origin": "Origen"
+      },
+      "select": "Seleccionar {annotation}",
+      "count": "Mostrando {shown} de {total}",
+      "canvasN": "Imagen {n}"
+    },
+    "gallery": {
+      "label": "Páginas",
+      "show": "Mostrar páginas",
+      "hide": "Ocultar páginas",
+      "page": "Página {n}: {label}",
+      "annotated": "Tiene sus anotaciones"
+    },
+    "settings": {
+      "label": "Ajustes",
+      "colour": "Color del visor"
+    },
+    "tools": {
+      "label": "Herramientas de dibujo",
+      "select": "Seleccionar y mover",
+      "rectangle": "Rectángulo",
+      "polygon": "Polígono (haga clic en puntos, doble clic para terminar)",
+      "ellipse": "Elipse",
+      "path": "A mano alzada",
+      "line": "Línea",
+      "smart": "Herramientas inteligentes",
+      "closeSmart": "Cerrar herramientas inteligentes",
+      "intelligent-scissors": "Tijeras inteligentes",
+      "magnetic-cursor": "Ajuste a bordes",
+      "smart-select": "Selección automática",
+      "enable": "Activar {tool}",
+      "hints": {
+        "intelligent-scissors": "Haga clic para empezar, siga el borde y haga clic para colocar puntos.",
+        "intelligent-scissorsMore": "Doble clic para terminar. Útil para contornos curvos y complejos.",
+        "magnetic-cursor": "El cursor se ajusta a los bordes cercanos al dibujar.",
+        "magnetic-cursorMore": "Útil para contornos nítidos y de alto contraste."
+      }
+    },
+    "sam": {
+      "unsupported": "La selección automática necesita WebGPU. Use Chrome o Edge en un ordenador de escritorio.",
+      "error": "No se pudo iniciar la selección automática: {message}",
+      "loading": "Cargando el modelo de selección…",
+      "download": "Descarga del modelo",
+      "cached": "El modelo se guarda en su navegador tras la primera descarga.",
+      "instructions": "Pase el cursor para previsualizar. Haga clic en un objeto y añada o quite puntos para afinar el contorno.",
+      "mode": "Modo de selección automática",
+      "add": "Seleccionar objeto",
+      "remove": "Quitar zona",
+      "busy": "Analizando la vista…",
+      "shift": "Mayús+clic también quita una zona.",
+      "paused": "Selección en pausa. Arrastre la imagen para moverla.",
+      "done": "Hecho",
+      "reset": "Restablecer"
+    },
+    "av": {
+      "recording": "Grabación",
+      "recordingN": "Grabación {n}",
+      "recordingKind": "Historia oral",
+      "position": "Posición de reproducción",
+      "loadError": "No se pudo cargar la grabación. Puede que el servidor de origen no esté disponible. Aún puede introducir los tiempos a mano.",
+      "details": "Detalles de la grabación",
+      "tabs": {
+        "transcript": "Transcripción",
+        "chapters": "Capítulos",
+        "annotations": "Anotaciones"
+      },
+      "findInTranscript": "Buscar en la transcripción",
+      "noTranscript": "No hay pasajes de transcripción.",
+      "noChapters": "No hay capítulos.",
+      "noAnnotations": "No hay anotaciones del elemento."
+    }
+  }
+}
