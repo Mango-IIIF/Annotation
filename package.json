@@ -1,6 +1,6 @@
 {
   "name": "@mango-iiif/annotation",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Framework-agnostic OpenSeadragon annotation editor.",
   "license": "MIT",
   "repository": {
@@ -44,15 +44,15 @@
   },
   "devDependencies": {
     "@annotorious/openseadragon": "3.9.5",
-    "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@mango-iiif/w3c-parser": "^1.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@types/node": "^24.1.0",
     "jsdom": "^27.0.1",
     "openseadragon": "^6.1.1",
+    "svelte": "^5.43.8",
     "typescript": "~5.9.3",
     "vite": "^8.0.16",
-    "vitest": "^3.0.0",
-    "svelte": "^5.43.8"
+    "vitest": "^5.1.0"
   },
   "peerDependencies": {
     "@annotorious/openseadragon": "^3.9.5",

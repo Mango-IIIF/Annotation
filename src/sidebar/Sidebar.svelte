@@ -15,6 +15,7 @@
     UserRound,
   } from '@lucide/svelte';
   import type { Snippet } from 'svelte';
+  import { formatTime, parseTime } from '../annotations/time';
   import { t } from '../core/i18n';
   import AuthoritySearch from '../authorities/AuthoritySearch.svelte';
   import type { AuthorityProvider } from '../authorities/types';
@@ -46,7 +47,7 @@
     /** Image: how many saved annotations the selected shape has. */
     regionCount?: number;
     drawing?: boolean;
-    /** A/V: target range, as typed. */
+    /** A/V: target range as strings of seconds; empty end means to the end. */
     start?: string;
     end?: string;
     currentTime?: number;
@@ -137,14 +138,45 @@
 
   const valueOf = (field: TextField) => draft.texts[field][language] ?? '';
 
+  let startText = $state('');
+  let endText = $state('');
+  let startInvalid = $state(false);
+  let endInvalid = $state(false);
+  const timeId = $props.id();
+
+  $effect(() => {
+    startText = formatTime(Number(start), { fraction: true });
+    startInvalid = false;
+  });
+
+  $effect(() => {
+    endText = end === '' ? '' : formatTime(Number(end), { fraction: true });
+    endInvalid = false;
+  });
+
+  const changeTime = (which: 'start' | 'end', text: string) => {
+    const emptyEnd = which === 'end' && text.trim() === '';
+    const seconds = emptyEnd ? null : parseTime(text);
+    const invalid = !emptyEnd && seconds === null;
+    const display = invalid ? text : emptyEnd ? '' : formatTime(seconds!, { fraction: true });
+    if (which === 'start') {
+      startText = display;
+      startInvalid = invalid;
+      if (!invalid) start = String(seconds);
+    } else {
+      endText = display;
+      endInvalid = invalid;
+      if (!invalid) end = emptyEnd ? '' : String(seconds);
+    }
+  };
+
   const useCurrentTime = (which: 'start' | 'end') => {
-    const value = String(Math.round(currentTime * 1000) / 1000);
-    if (which === 'start') start = value;
-    else end = value;
+    changeTime(which, String(Math.round(currentTime)));
   };
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
+    if (kind === 'av' && visibility.selection !== false && (startInvalid || endInvalid)) return;
     onsave();
   };
 </script>
@@ -201,7 +233,19 @@
       <div class="anno-times">
         <label>
           {$t('annotate.time.start')}
-          <input class="anno-input" type="number" min="0" step="0.001" bind:value={start} />
+          <input
+            class="anno-input"
+            type="text"
+            inputmode="decimal"
+            aria-label={$t('annotate.time.start')}
+            aria-invalid={startInvalid}
+            aria-describedby={startInvalid ? timeId + '-start-format' : undefined}
+            bind:value={startText}
+            onchange={(event) => changeTime('start', event.currentTarget.value)}
+          />
+          {#if startInvalid}
+            <span id={timeId + '-start-format'} class="anno-error" role="alert">{$t('annotate.time.format')}</span>
+          {/if}
           <button type="button" class="anno-subtle" disabled={!playbackReady} onclick={() => useCurrentTime('start')}>
             <Clock size={14} aria-hidden="true" />
             {$t('annotate.time.useCurrent')}
@@ -209,7 +253,19 @@
         </label>
         <label>
           {$t('annotate.time.end')}
-          <input class="anno-input" type="number" min="0" step="0.001" bind:value={end} />
+          <input
+            class="anno-input"
+            type="text"
+            inputmode="decimal"
+            aria-label={$t('annotate.time.end')}
+            aria-invalid={endInvalid}
+            aria-describedby={endInvalid ? timeId + '-end-format' : undefined}
+            bind:value={endText}
+            onchange={(event) => changeTime('end', event.currentTarget.value)}
+          />
+          {#if endInvalid}
+            <span id={timeId + '-end-format'} class="anno-error" role="alert">{$t('annotate.time.format')}</span>
+          {/if}
           <button type="button" class="anno-subtle" disabled={!playbackReady} onclick={() => useCurrentTime('end')}>
             <Clock size={14} aria-hidden="true" />
             {$t('annotate.time.useCurrent')}

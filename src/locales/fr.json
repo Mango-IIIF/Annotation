@@ -45,7 +45,8 @@
       "delete": "Supprimer la forme"
     },
     "time": {
-      "start": "Début (secondes)",
+      "format": "Saisissez une durée comme 1:02:05, 2:05 ou 125.",
+      "start": "Début",
       "end": "Fin (facultatif)",
       "useCurrent": "Utiliser le temps actuel"
     },

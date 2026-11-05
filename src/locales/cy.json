@@ -45,7 +45,8 @@
       "delete": "Dileu siâp"
     },
     "time": {
-      "start": "Dechrau (eiliadau)",
+      "format": "Rhowch amser fel 1:02:05, 2:05 neu 125.",
+      "start": "Dechrau",
       "end": "Diwedd (dewisol)",
       "useCurrent": "Defnyddio'r amser presennol"
     },

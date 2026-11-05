@@ -45,7 +45,8 @@
       "delete": "Delete shape"
     },
     "time": {
-      "start": "Start (seconds)",
+      "format": "Enter a time such as 1:02:05, 2:05 or 125.",
+      "start": "Start",
       "end": "End (optional)",
       "useCurrent": "Use current time"
     },

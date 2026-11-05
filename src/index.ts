@@ -95,3 +95,5 @@ export type {
   ShapeGeometry,
   ShapeType,
 } from './types';
+
+export { formatTime, parseTime } from './annotations/time';

@@ -45,7 +45,8 @@
       "delete": "Eliminar forma"
     },
     "time": {
-      "start": "Inicio (segundos)",
+      "format": "Escribe una hora como 1:02:05, 2:05 o 125.",
+      "start": "Inicio",
       "end": "Fin (opcional)",
       "useCurrent": "Usar el tiempo actual"
     },
