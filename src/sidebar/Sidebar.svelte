@@ -3,6 +3,7 @@
     Check,
     Clock,
     Eye,
+    Image,
     Link,
     MessageCircle,
     Pencil,
@@ -13,6 +14,7 @@
     Tag,
     Trash2,
     UserRound,
+    X,
   } from '@lucide/svelte';
   import type { Snippet } from 'svelte';
   import { formatTime, parseTime } from '../annotations/time';
@@ -64,7 +66,9 @@
     /** Replaces the built-in authority search for the Identify intent. */
     identify?: Snippet<[IdentifySnippetContext]>;
     ondrawbox?: () => void;
+    oncanceldraw?: () => void;
     ondeleteshape?: () => void;
+    oncleartarget?: () => void;
     onsave: () => void;
     oncancel: () => void;
     onedit: (id: string) => void;
@@ -95,7 +99,9 @@
     assist,
     identify,
     ondrawbox,
+    oncanceldraw,
     ondeleteshape,
+    oncleartarget,
     onsave,
     oncancel,
     onedit,
@@ -112,20 +118,22 @@
     link: Link,
   } as const;
 
-  /* Whole-item annotations from elsewhere still load and show; they're not offered for new ones. */
-  const SCOPES = ['region', 'canvas'] as const;
-
   const languageName = (code: string) =>
     new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
 
+  let hasTarget = $derived(
+    kind === 'av' ||
+      visibility.selection === false ||
+      scope !== 'region' ||
+      Boolean(region) ||
+      editing,
+  );
   let filled = $derived(filledLanguages(draft, languages));
   let showLanguages = $derived(
     languages.length > 1 && draft.intent !== null && TEXT_INTENTS.includes(draft.intent),
   );
   let hint = $derived(
-    draft.intent
-      ? $t(`annotate.intents.${draft.intent}.hint.${kind}`)
-      : $t('annotate.intents.choose'),
+    draft.intent ? $t(`annotate.intents.${draft.intent}.hint.${kind}`) : '',
   );
 
   const pick = (intent: Intent) => (draft.intent = intent);
@@ -191,44 +199,97 @@
     {/if}
 
     {#if visibility.selection !== false && kind === 'image'}
-      <div class="anno-group">
-        <div class="anno-segmented" role="group" aria-label={$t('annotate.scope.label')}>
-          {#each SCOPES as option (option)}
-            <button type="button" aria-pressed={scope === option} onclick={() => (scope = option)}>
-              {$t(`annotate.scope.${option}`)}
-            </button>
-          {/each}
-        </div>
-        {#if scope === 'region'}
-          <div class="anno-region" class:selected={region}>
+      {#if !hasTarget}
+        <div class="anno-start" class:drawing>
+          <p class="anno-start__prompt">
             <Scan size={18} aria-hidden="true" />
-            <span class="anno-region__text">
-              {#if region}
-                {$t('annotate.region.selected', { w: Math.round(region.w), h: Math.round(region.h) })}
-                {#if regionCount}· {$t('annotate.region.count', { count: regionCount })}{/if}
-              {:else if drawing}
-                {$t('annotate.region.drawing')}
-              {:else}
-                {$t('annotate.region.none')}
-              {/if}
-            </span>
-            <button type="button" class="anno-region__draw" onclick={() => ondrawbox?.()}>
-              {region ? $t('annotate.region.redraw') : $t('annotate.region.draw')}
+            <span>{drawing ? $t('annotate.region.drawingShort') : $t('annotate.region.start')}</span>
+          </p>
+          <div class="anno-start__actions">
+            {#if drawing && oncanceldraw}
+              <button type="button" class="anno-secondary anno-start__primary" onclick={() => oncanceldraw?.()}>
+                {$t('annotate.region.cancelDraw')}
+              </button>
+            {:else}
+              <button type="button" class="anno-primary anno-start__primary" onclick={() => ondrawbox?.()}>
+                {$t('annotate.region.draw')}
+              </button>
+            {/if}
+            <button
+              type="button"
+              class="anno-start__whole"
+              onclick={() => {
+                oncanceldraw?.();
+                scope = 'canvas';
+              }}
+            >
+              <Image size={15} aria-hidden="true" />
+              {$t('annotate.scope.wholeImageAction')}
             </button>
+          </div>
+        </div>
+      {:else if scope === 'region'}
+        <div class="anno-target" class:selected={region} class:empty={!region}>
+          <div class="anno-target__info">
+            <Scan size={16} aria-hidden="true" />
+            <div class="anno-target__text">
+              {#if region}
+                <span class="anno-target__title">{$t('annotate.region.selectedTitle')}</span>
+                <span class="anno-target__meta">
+                  {$t('annotate.region.dimensions', { w: Math.round(region.w), h: Math.round(region.h) })}{#if regionCount}{' · '}{$t('annotate.region.count', { count: regionCount })}{/if}
+                </span>
+              {:else if drawing}
+                <span class="anno-target__title">{$t('annotate.region.drawingShort')}</span>
+              {:else}
+                <span class="anno-target__title">{$t('annotate.region.none')}</span>
+              {/if}
+            </div>
+          </div>
+          <div class="anno-target__actions">
+            {#if drawing && !region && oncanceldraw}
+              <button type="button" class="anno-region__draw" onclick={() => oncanceldraw?.()}>
+                {$t('annotate.region.cancelDraw')}
+              </button>
+            {:else}
+              <button type="button" class="anno-region__draw" onclick={() => ondrawbox?.()}>
+                {region ? $t('annotate.region.redraw') : $t('annotate.region.draw')}
+              </button>
+            {/if}
             {#if region}
               <button
                 type="button"
-                class="anno-region__delete"
+                class="anno-region__icon"
                 aria-label={$t('annotate.region.delete')}
                 title={$t('annotate.region.delete')}
                 onclick={() => ondeleteshape?.()}
               >
                 <Trash2 size={15} aria-hidden="true" />
               </button>
+              {#if !editing && oncleartarget}
+                <button
+                  type="button"
+                  class="anno-region__icon"
+                  aria-label={$t('annotate.region.clear')}
+                  title={$t('annotate.region.clear')}
+                  onclick={() => oncleartarget?.()}
+                >
+                  <X size={15} aria-hidden="true" />
+                </button>
+              {/if}
             {/if}
           </div>
-        {/if}
-      </div>
+        </div>
+      {:else}
+        <div class="anno-target selected">
+          <div class="anno-target__info">
+            <Image size={16} aria-hidden="true" />
+            <span class="anno-target__title">{$t(`annotate.scope.short.${scope}`)}</span>
+          </div>
+          <button type="button" class="anno-subtle" onclick={() => (scope = 'region')}>
+            {$t('annotate.scope.switchToArea')}
+          </button>
+        </div>
+      {/if}
     {:else if visibility.selection !== false}
       <div class="anno-times">
         <label>
@@ -274,6 +335,7 @@
       </div>
     {/if}
 
+    {#if hasTarget}
     {#if visibility.intents !== false}
     <div class="anno-group">
       <span class="anno-field-label" id="anno-intent-label">{$t('annotate.intents.question')}</span>
@@ -290,7 +352,9 @@
           </button>
         {/each}
       </div>
-      <p class="anno-hint">{hint}</p>
+      {#if hint}
+        <p class="anno-hint">{hint}</p>
+      {/if}
     </div>
     {/if}
 
@@ -443,6 +507,7 @@
         <pre>{JSON.stringify(preview, null, 2)}</pre>
       </details>
     {/if}
+    {/if}
   </form>
 
   {#if visibility.annotations !== false}
@@ -567,56 +632,158 @@
     color: var(--viewer-text);
   }
 
-  .anno-region {
+  .anno-start {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 6px 6px 10px;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
     border: 1px dashed var(--anno-dashed);
-    border-radius: 6px;
+    border-radius: 10px;
     background: var(--anno-tint);
-    font-size: 13px;
-    line-height: 1.45;
   }
 
-  .anno-region.selected {
+  .anno-start.drawing {
     border-style: solid;
     border-color: var(--anno-accent);
   }
 
-  .anno-region :global(svg) {
-    flex-shrink: 0;
+  .anno-start__prompt {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    color: var(--viewer-text);
+    font-size: 13.5px;
+    line-height: 1.45;
   }
 
-  .anno-region__text {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .anno-region__draw,
-  .anno-region__delete {
+  .anno-start__prompt :global(svg) {
     flex-shrink: 0;
-    height: 32px;
-    border: 1px solid var(--anno-accent);
-    border-radius: 6px;
-    background: var(--anno-raised);
+    margin-top: 2px;
     color: var(--anno-accent);
+  }
+
+  .anno-start__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .anno-start__primary {
+    width: 100%;
+    height: 38px;
+    font-size: 14px;
+  }
+
+  .anno-start__whole {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    height: 34px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--viewer-muted);
     font: inherit;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
   }
 
-  .anno-region__draw {
-    padding: 0 10px;
+  .anno-start__whole:hover,
+  .anno-start__whole:focus-visible {
+    background: color-mix(in srgb, var(--anno-accent) 10%, transparent);
+    color: var(--anno-accent);
   }
 
-  .anno-region__delete {
+  .anno-target {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 8px 8px 12px;
+    border: 1px solid var(--anno-accent);
+    border-radius: 8px;
+    background: var(--anno-tint);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .anno-target.empty {
+    border-style: dashed;
+    border-color: var(--anno-dashed);
+  }
+
+  .anno-target__info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .anno-target__info :global(svg) {
+    flex-shrink: 0;
+    color: var(--anno-accent);
+  }
+
+  .anno-target__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .anno-target__title {
+    font-weight: 600;
+    color: var(--viewer-text);
+  }
+
+  .anno-target__meta {
+    color: var(--viewer-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .anno-target__actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .anno-region__draw,
+  .anno-region__icon {
+    flex-shrink: 0;
+    height: 30px;
+    border: 1px solid var(--anno-accent);
+    border-radius: 6px;
+    background: var(--anno-raised);
+    color: var(--anno-accent);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .anno-region__draw {
+    padding: 0 9px;
+  }
+
+  .anno-region__icon {
     display: grid;
     place-items: center;
-    width: 32px;
+    width: 30px;
     border-color: transparent;
     background: transparent;
+    color: var(--viewer-muted);
+  }
+
+  .anno-region__icon:hover,
+  .anno-region__icon:focus-visible {
+    background: color-mix(in srgb, var(--anno-accent) 12%, transparent);
+    color: var(--anno-accent);
   }
 
   .anno-row {

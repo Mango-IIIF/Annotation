@@ -28,6 +28,8 @@
       "label": "What is it about?",
       "region": "An area",
       "canvas": "This image",
+      "wholeImageAction": "Annotate whole image",
+      "switchToArea": "Switch to an area",
       "short": {
         "region": "Area",
         "canvas": "Whole image",
@@ -36,13 +38,19 @@
       }
     },
     "region": {
+      "start": "Draw on the image to annotate an area, or click an existing shape.",
       "none": "Draw a box on the image, or click a shape.",
       "drawing": "Click on the image to start, and again to finish.",
+      "drawingShort": "Drawing on the image…",
+      "cancelDraw": "Cancel",
       "selected": "Area selected, {w} × {h} px",
-      "count": "annotations: {count}",
+      "selectedTitle": "Area selected",
+      "dimensions": "{w} × {h} px",
+      "count": "{count} on this area",
       "draw": "Draw a box",
       "redraw": "Redraw",
-      "delete": "Delete shape"
+      "delete": "Delete shape",
+      "clear": "Clear selection"
     },
     "time": {
       "format": "Enter a time such as 1:02:05, 2:05 or 125.",

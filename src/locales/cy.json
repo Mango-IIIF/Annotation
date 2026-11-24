@@ -28,6 +28,8 @@
       "label": "Am beth mae o?",
       "region": "Ardal",
       "canvas": "Y ddelwedd hon",
+      "wholeImageAction": "Anodi'r ddelwedd gyfan",
+      "switchToArea": "Newid i ardal",
       "short": {
         "region": "Ardal",
         "canvas": "Delwedd gyfan",
@@ -36,13 +38,19 @@
       }
     },
     "region": {
+      "start": "Tynnwch ar y ddelwedd i anodi ardal, neu cliciwch siâp presennol.",
       "none": "Tynnwch flwch ar y ddelwedd, neu cliciwch siâp.",
       "drawing": "Cliciwch ar y ddelwedd i ddechrau, ac eto i orffen.",
+      "drawingShort": "Wrthi'n tynnu ar y ddelwedd…",
+      "cancelDraw": "Canslo",
       "selected": "Ardal wedi'i dewis, {w} × {h} px",
-      "count": "anodiadau: {count}",
+      "selectedTitle": "Ardal wedi'i dewis",
+      "dimensions": "{w} × {h} px",
+      "count": "{count} ar yr ardal hon",
       "draw": "Tynnu blwch",
       "redraw": "Ail-dynnu",
-      "delete": "Dileu siâp"
+      "delete": "Dileu siâp",
+      "clear": "Clirio'r dewis"
     },
     "time": {
       "format": "Rhowch amser fel 1:02:05, 2:05 neu 125.",

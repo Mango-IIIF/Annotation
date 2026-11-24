@@ -28,6 +28,8 @@
       "label": "De quoi s'agit-il ?",
       "region": "Une zone",
       "canvas": "Cette image",
+      "wholeImageAction": "Annoter toute l'image",
+      "switchToArea": "Passer à une zone",
       "short": {
         "region": "Zone",
         "canvas": "Image entière",
@@ -36,13 +38,19 @@
       }
     },
     "region": {
+      "start": "Dessinez sur l'image pour annoter une zone ou cliquez sur une forme existante.",
       "none": "Dessinez un cadre sur l'image, ou cliquez sur une forme.",
       "drawing": "Cliquez sur l'image pour commencer, puis à nouveau pour terminer.",
+      "drawingShort": "Dessin sur l'image…",
+      "cancelDraw": "Annuler",
       "selected": "Zone sélectionnée, {w} × {h} px",
-      "count": "annotations : {count}",
+      "selectedTitle": "Zone sélectionnée",
+      "dimensions": "{w} × {h} px",
+      "count": "{count} sur cette zone",
       "draw": "Dessiner un cadre",
       "redraw": "Redessiner",
-      "delete": "Supprimer la forme"
+      "delete": "Supprimer la forme",
+      "clear": "Effacer la sélection"
     },
     "time": {
       "format": "Saisissez une durée comme 1:02:05, 2:05 ou 125.",
