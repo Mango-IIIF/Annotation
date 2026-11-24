@@ -28,6 +28,8 @@
       "label": "¿Sobre qué es?",
       "region": "Una zona",
       "canvas": "Esta imagen",
+      "wholeImageAction": "Anotar toda la imagen",
+      "switchToArea": "Cambiar a una zona",
       "short": {
         "region": "Zona",
         "canvas": "Imagen completa",
@@ -36,13 +38,19 @@
       }
     },
     "region": {
+      "start": "Dibuje en la imagen para anotar una zona o haga clic en una forma existente.",
       "none": "Dibuje un recuadro en la imagen o haga clic en una forma.",
       "drawing": "Haga clic en la imagen para empezar y otra vez para terminar.",
+      "drawingShort": "Dibujando en la imagen…",
+      "cancelDraw": "Cancelar",
       "selected": "Zona seleccionada, {w} × {h} px",
-      "count": "anotaciones: {count}",
+      "selectedTitle": "Zona seleccionada",
+      "dimensions": "{w} × {h} px",
+      "count": "{count} en esta zona",
       "draw": "Dibujar un recuadro",
       "redraw": "Redibujar",
-      "delete": "Eliminar forma"
+      "delete": "Eliminar forma",
+      "clear": "Quitar selección"
     },
     "time": {
       "format": "Escribe una hora como 1:02:05, 2:05 o 125.",

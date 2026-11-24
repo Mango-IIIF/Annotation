@@ -28,6 +28,8 @@
       "label": "何についての注釈ですか？",
       "region": "範囲",
       "canvas": "この画像",
+      "wholeImageAction": "画像全体に注釈を付ける",
+      "switchToArea": "範囲に変更",
       "short": {
         "region": "範囲",
         "canvas": "画像全体",
@@ -36,13 +38,19 @@
       }
     },
     "region": {
+      "start": "画像上に描いて範囲を注釈するか、既存の図形をクリックしてください。",
       "none": "画像上に枠を描くか、図形をクリックしてください。",
       "drawing": "画像をクリックして開始し、もう一度クリックして終了します。",
+      "drawingShort": "画像上に描画中…",
+      "cancelDraw": "キャンセル",
       "selected": "選択した範囲: {w} × {h} px",
-      "count": "注釈: {count}",
+      "selectedTitle": "選択した範囲",
+      "dimensions": "{w} × {h} px",
+      "count": "この範囲に {count} 件",
       "draw": "枠を描く",
       "redraw": "描き直す",
-      "delete": "図形を削除"
+      "delete": "図形を削除",
+      "clear": "選択を解除"
     },
     "time": {
       "format": "1:02:05、2:05、125 のように時間を入力してください。",
