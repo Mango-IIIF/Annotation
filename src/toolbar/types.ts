@@ -3,6 +3,7 @@ export type Tool =
   | 'rectangle'
   | 'polygon'
   | 'ellipse'
+  | 'point'
   | 'path'
   | 'line'
   | 'intelligent-scissors'

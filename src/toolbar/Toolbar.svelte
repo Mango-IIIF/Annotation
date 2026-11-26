@@ -6,6 +6,7 @@
     Grip,
     LoaderCircle,
     Magnet,
+    MapPin,
     Minus,
     MousePointer2,
     Pentagon,
@@ -20,14 +21,29 @@
   import { t } from '../core/i18n';
   import type { SamCommand, SamState, Tool } from './types';
 
+  const DEFAULT_BASIC_TOOLS: readonly Tool[] = [
+    'select',
+    'rectangle',
+    'polygon',
+    'ellipse',
+    'path',
+    'line',
+  ];
+
   interface Props {
     tool: Tool;
-    samState: SamState;
-    samMode: 'add' | 'remove';
+    /** Which basic drawing tools to show, in order. Defaults to select/rect/polygon/ellipse/path/line. */
+    tools?: readonly Tool[];
+    /** Show the smart tools popover (Smart Scissors, Edge Snap, Auto Select). Default true. */
+    smartTools?: boolean;
+    /** Floating overlay on the stage (default) or inline horizontal bar for embedding in panels. */
+    layout?: 'floating' | 'inline';
+    samState?: SamState;
+    samMode?: 'add' | 'remove';
     autoSelect?: boolean;
     ontoolchange: (tool: Tool) => void;
-    onsammode: (mode: 'add' | 'remove') => void;
-    onsamcommand: (command: SamCommand) => void;
+    onsammode?: (mode: 'add' | 'remove') => void;
+    onsamcommand?: (command: SamCommand) => void;
     /** Whether the page gallery is showing; undefined when there is none to show. */
     gallery?: boolean;
     ongallerytoggle?: () => void;
@@ -35,24 +51,38 @@
 
   let {
     tool,
-    samState,
-    samMode,
+    tools = DEFAULT_BASIC_TOOLS,
+    smartTools = true,
+    layout = 'floating',
+    samState = { state: 'idle' },
+    samMode = 'add',
     autoSelect = true,
     ontoolchange,
-    onsammode,
-    onsamcommand,
+    onsammode = undefined,
+    onsamcommand = undefined,
     gallery = undefined,
     ongallerytoggle = undefined,
   }: Props = $props();
 
-  const BASIC = [
+  const ALL_BASIC = [
     { id: 'select', icon: MousePointer2 },
     { id: 'rectangle', icon: Square },
     { id: 'polygon', icon: Pentagon },
     { id: 'ellipse', icon: Circle },
+    { id: 'point', icon: MapPin },
     { id: 'path', icon: Spline },
     { id: 'line', icon: Slash },
   ] as const;
+
+  const BASIC_MAP = new Map<string, (typeof ALL_BASIC)[number]>(
+    ALL_BASIC.map((entry) => [entry.id, entry]),
+  );
+
+  let visibleBasic = $derived(
+    tools
+      .map((id) => BASIC_MAP.get(id))
+      .filter((entry): entry is (typeof ALL_BASIC)[number] => Boolean(entry)),
+  );
 
   const ALL_SMART = [
     { id: 'intelligent-scissors', icon: ScissorsLineDashed },
@@ -77,7 +107,7 @@
       ontoolchange('select');
       return;
     }
-    onsammode(mode);
+    onsammode?.(mode);
     ontoolchange('smart-select');
   };
 
@@ -107,9 +137,14 @@
   let samBusy = $derived(samEnabled && samState.state === 'ready' && samState.busy);
 </script>
 
-<div class="anno-toolbar-wrap">
-  <div class="anno-toolbar" role="toolbar" aria-label={$t('annotate.tools.label')}>
-    {#each BASIC as entry (entry.id)}
+<div class="anno-toolbar-wrap" class:anno-toolbar-wrap--inline={layout === 'inline'}>
+  <div
+    class="anno-toolbar"
+    class:anno-toolbar--inline={layout === 'inline'}
+    role="toolbar"
+    aria-label={$t('annotate.tools.label')}
+  >
+    {#each visibleBasic as entry (entry.id)}
       <button
         type="button"
         class="anno-tool"
@@ -125,26 +160,28 @@
         <entry.icon size={16} aria-hidden="true" />
       </button>
     {/each}
-    <span class="anno-sep" aria-hidden="true"></span>
-    <button
-      type="button"
-      class="anno-tool"
-      class:active={open}
-      aria-expanded={open}
-      aria-controls={panelId}
-      aria-label={$t('annotate.tools.smart')}
-      title={$t('annotate.tools.smart')}
-      onclick={() => {
-        if (open) {
-          close();
-        } else {
-          open = true;
-          ontoolchange(tab);
-        }
-      }}
-    >
-      <Sparkles size={16} aria-hidden="true" />
-    </button>
+    {#if smartTools}
+      <span class="anno-sep" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="anno-tool"
+        class:active={open}
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={$t('annotate.tools.smart')}
+        title={$t('annotate.tools.smart')}
+        onclick={() => {
+          if (open) {
+            close();
+          } else {
+            open = true;
+            ontoolchange(tab);
+          }
+        }}
+      >
+        <Sparkles size={16} aria-hidden="true" />
+      </button>
+    {/if}
     {#if gallery !== undefined}
       <span class="anno-sep" aria-hidden="true"></span>
       <button
@@ -161,7 +198,7 @@
     {/if}
   </div>
 
-  {#if open}
+  {#if smartTools && open}
     <section
       class="anno-smart"
       id={panelId}
@@ -278,10 +315,10 @@
                       : $t('annotate.sam.paused')}
                 </p>
                 <div class="anno-smart__actions">
-                  <button type="button" disabled={!samCanFinish} onclick={() => onsamcommand('done')}>
+                  <button type="button" disabled={!samCanFinish} onclick={() => onsamcommand?.('done')}>
                     {$t('annotate.sam.done')}
                   </button>
-                  <button type="button" disabled={!samCanFinish} onclick={() => onsamcommand('reset')}>
+                  <button type="button" disabled={!samCanFinish} onclick={() => onsamcommand?.('reset')}>
                     {$t('annotate.sam.reset')}
                   </button>
                 </div>
@@ -308,6 +345,15 @@
     pointer-events: none;
   }
 
+  .anno-toolbar-wrap--inline {
+    position: static;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    z-index: auto;
+    pointer-events: auto;
+  }
+
   .anno-toolbar,
   .anno-smart {
     pointer-events: auto;
@@ -328,11 +374,16 @@
     scrollbar-width: none;
   }
 
-  .anno-tool {
-    flex: none;
+  .anno-toolbar--inline {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-height: none;
+    overflow: visible;
+    box-shadow: none;
   }
 
   .anno-tool {
+    flex: none;
     display: grid;
     place-items: center;
     width: 32px;
@@ -349,8 +400,8 @@
   }
 
   .anno-tool.active {
-    background: var(--anno-accent);
-    color: var(--anno-on-accent);
+    background: var(--anno-accent, var(--viewer-accent, #2ac7ff));
+    color: var(--anno-on-accent, #0b0f14);
   }
 
   .anno-sep {
@@ -358,6 +409,12 @@
     height: 1px;
     margin: 3px 6px;
     background: var(--viewer-toolbar-separator, rgba(255, 255, 255, 0.14));
+  }
+
+  .anno-toolbar--inline .anno-sep {
+    width: 1px;
+    height: auto;
+    margin: 6px 3px;
   }
 
   .anno-smart {
@@ -450,9 +507,9 @@
   }
 
   .anno-smart__toggle[aria-pressed='true'] {
-    border-color: var(--anno-accent);
-    background: var(--anno-accent);
-    color: var(--anno-on-accent);
+    border-color: var(--anno-accent, var(--viewer-accent, #2ac7ff));
+    background: var(--anno-accent, var(--viewer-accent, #2ac7ff));
+    color: var(--anno-on-accent, #0b0f14);
   }
 
   .anno-smart__modes {
@@ -515,14 +572,14 @@
 
   /* Narrow stages are short too: the tools go in a row along the top instead. */
   @container anno-stage (width <= 520px) {
-    .anno-toolbar-wrap {
+    .anno-toolbar-wrap:not(.anno-toolbar-wrap--inline) {
       top: 8px;
       right: 8px;
       left: 8px;
       flex-direction: column;
     }
 
-    .anno-toolbar {
+    .anno-toolbar:not(.anno-toolbar--inline) {
       flex-direction: row;
       max-width: 100%;
       max-height: none;
@@ -530,7 +587,7 @@
       overflow-y: hidden;
     }
 
-    .anno-sep {
+    .anno-toolbar:not(.anno-toolbar--inline) .anno-sep {
       flex: none;
       width: 1px;
       height: auto;

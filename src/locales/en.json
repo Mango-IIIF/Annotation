@@ -228,6 +228,7 @@
       "ellipse": "Ellipse",
       "path": "Freehand",
       "line": "Line",
+      "point": "Point",
       "smart": "Smart tools",
       "closeSmart": "Close smart tools",
       "intelligent-scissors": "Smart Scissors",

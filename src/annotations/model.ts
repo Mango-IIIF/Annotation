@@ -15,8 +15,22 @@ export const newId = (): string => {
   return `urn:uuid:${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 };
 
-export const bodiesOf = (annotation: Pick<Annotation, 'body'>): AnnotationBody[] =>
-  annotation.body == null ? [] : Array.isArray(annotation.body) ? annotation.body : [annotation.body];
+/** The bodies, with a Choice's items read in its place (the same text in several languages, IIIF Cookbook recipe 0346). */
+export const bodiesOf = (annotation: Pick<Annotation, 'body'>): AnnotationBody[] => {
+  const bodies = annotation.body == null ? [] : Array.isArray(annotation.body) ? annotation.body : [annotation.body];
+  return bodies.flatMap((body) => (body.type === 'Choice' && Array.isArray(body.items) ? body.items : [body]));
+};
+
+/** A body's languages: hosts may write `"cy"` or `["cy"]`. */
+export const languagesOf = (body: AnnotationBody): string[] => {
+  const value: unknown = body.language;
+  if (Array.isArray(value)) return value.filter((language): language is string => typeof language === 'string');
+  return typeof value === 'string' && value ? [value] : [];
+};
+
+/** The same text in each language: one body as it is, two or more as a Choice so viewers show one (recipe 0346). */
+export const languageChoice = (bodies: AnnotationBody[]): AnnotationBody[] =>
+  bodies.length > 1 ? [{ type: 'Choice', items: bodies }] : bodies;
 
 export const motivationsOf = (annotation: Pick<Annotation, 'motivation'>): string[] =>
   annotation.motivation == null
@@ -43,19 +57,34 @@ export const targetSource = (target: AnnotationTarget): string => {
   return 'id' in target ? String(target.id).split('#')[0] : '';
 };
 
-export const textBody = (
-  value: string,
-  language: string,
-  purpose?: string,
-  generator?: Generator,
-): AnnotationBody => ({
+/** No purpose: the annotation's motivation already says what the text is (IIIF Cookbook recipes 0021, 0266). */
+export const textBody = (value: string, language: string, generator?: Generator): AnnotationBody => ({
   type: 'TextualBody',
   value: value.trim(),
   format: 'text/plain',
   language,
-  ...(purpose ? { purpose } : {}),
   ...(generator ? { generator } : {}),
 });
+
+/** The ids of an annotation's `creator`, which may be a URI, an Agent, or a list of either. */
+export const creatorIds = (annotation: Annotation): string[] => {
+  const creators = Array.isArray(annotation.creator) ? annotation.creator : [annotation.creator];
+  return creators.flatMap((creator) => {
+    if (typeof creator === 'string') return [creator];
+    const id = (creator as { id?: unknown } | null | undefined)?.id;
+    return typeof id === 'string' ? [id] : [];
+  });
+};
+
+/** The first name an annotation's `creator` gives, if any. */
+export const creatorName = (annotation: Annotation): string | undefined => {
+  const creators = Array.isArray(annotation.creator) ? annotation.creator : [annotation.creator];
+  for (const creator of creators) {
+    const name = (creator as { name?: unknown } | null | undefined)?.name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
+  }
+  return undefined;
+};
 
 export const mediaFragment = (start: number | string, end?: number | string | null): string =>
   `t=${Number(start) || 0}` + (end !== '' && end != null ? `,${Number(end)}` : '');

@@ -9,6 +9,16 @@ export interface AuthorityEntity {
   generator?: string;
 }
 
+/**
+ * An entity with its name in each language, e.g. `{ en: 'Cardiff', cy: 'Caerdydd' }`: suggested by
+ * the authority (Wikidata's labels) and set by the user. `label` stays the name shown in lists.
+ */
+export type NamedEntity = AuthorityEntity & {
+  labels?: Record<string, string>;
+  /** The names are settled (fetched, typed or loaded), so they aren't fetched again. */
+  labelsChecked?: boolean;
+};
+
 export interface AuthorityProvider {
   id: string;
   label: string;

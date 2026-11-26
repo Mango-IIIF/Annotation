@@ -228,6 +228,7 @@
       "ellipse": "楕円",
       "path": "フリーハンド",
       "line": "線",
+      "point": "点",
       "smart": "スマートツール",
       "closeSmart": "スマートツールを閉じる",
       "intelligent-scissors": "スマートはさみ",

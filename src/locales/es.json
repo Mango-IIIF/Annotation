@@ -228,6 +228,7 @@
       "ellipse": "Elipse",
       "path": "A mano alzada",
       "line": "Línea",
+      "point": "Punto",
       "smart": "Herramientas inteligentes",
       "closeSmart": "Cerrar herramientas inteligentes",
       "intelligent-scissors": "Tijeras inteligentes",

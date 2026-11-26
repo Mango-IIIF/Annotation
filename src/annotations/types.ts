@@ -35,12 +35,18 @@ export interface AnnotationBody {
   value?: string;
   purpose?: string;
   format?: string;
+  /**
+   * One language. Hosts may serve it as a one-item array (`["cy"]`), which means the same: read it
+   * with `languagesOf()`.
+   */
   language?: string;
   label?: unknown;
-  source?: string | { id: string; type?: string; format?: string };
+  source?: string | { id: string; type?: string; format?: string; partOf?: unknown };
   selector?: Selector;
   /** Set when the body was suggested by software, e.g. an AI model. */
   generator?: Generator;
+  /** A Choice's alternatives, e.g. the same text in several languages (IIIF Cookbook recipe 0346). */
+  items?: AnnotationBody[];
   [key: string]: unknown;
 }
 
