@@ -202,7 +202,7 @@
       {#if !hasTarget}
         <div class="anno-start" class:drawing>
           <p class="anno-start__prompt">
-            <Scan size={18} aria-hidden="true" />
+            <Scan size={16} aria-hidden="true" />
             <span>{drawing ? $t('annotate.region.drawingShort') : $t('annotate.region.start')}</span>
           </p>
           <div class="anno-start__actions">
@@ -223,7 +223,7 @@
                 scope = 'canvas';
               }}
             >
-              <Image size={15} aria-hidden="true" />
+              <Image size={14} aria-hidden="true" />
               {$t('annotate.scope.wholeImageAction')}
             </button>
           </div>
@@ -347,7 +347,7 @@
             aria-pressed={draft.intent === intent}
             onclick={() => pick(intent)}
           >
-            <Icon size={22} aria-hidden="true" />
+            <Icon size={18} aria-hidden="true" />
             {$t(`annotate.intents.${intent}.label`)}
           </button>
         {/each}
@@ -548,22 +548,22 @@
   .anno-sidebar {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
     height: 100%;
     min-height: 0;
-    padding: 20px;
+    padding: 16px;
     overflow: auto;
     box-sizing: border-box;
     border-left: 1px solid var(--viewer-panel-border);
     background: var(--anno-surface);
     color: var(--viewer-text);
-    font-size: 15px;
+    font-size: 13.5px;
   }
 
   .anno-form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
 
   .anno-editing {
@@ -572,7 +572,7 @@
     gap: 6px;
     margin: 0;
     color: var(--anno-accent);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
   }
 
@@ -586,11 +586,11 @@
   .anno-field {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
 
   :global(.anno-field-label) {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
   }
 
@@ -604,7 +604,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
     gap: 4px;
-    padding: 4px;
+    padding: 3px;
     border-radius: 8px;
     background: var(--anno-tint);
   }
@@ -614,14 +614,14 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-height: 40px;
+    min-height: 32px;
     padding: 0 8px;
     border: 0;
     border-radius: 6px;
     background: transparent;
     color: var(--viewer-muted);
     font: inherit;
-    font-size: 14px;
+    font-size: 12.5px;
     font-weight: 600;
     cursor: pointer;
   }
@@ -635,10 +635,10 @@
   .anno-start {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px;
+    gap: 10px;
+    padding: 12px;
     border: 1px dashed var(--anno-dashed);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--anno-tint);
   }
 
@@ -650,10 +650,10 @@
   .anno-start__prompt {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
     margin: 0;
     color: var(--viewer-text);
-    font-size: 13.5px;
+    font-size: 12.5px;
     line-height: 1.45;
   }
 
@@ -666,13 +666,13 @@
   .anno-start__actions {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
   }
 
   .anno-start__primary {
     width: 100%;
-    height: 38px;
-    font-size: 14px;
+    height: 34px;
+    font-size: 13px;
   }
 
   .anno-start__whole {
@@ -681,13 +681,13 @@
     justify-content: center;
     gap: 6px;
     width: 100%;
-    height: 34px;
+    height: 30px;
     border: 0;
     border-radius: 6px;
     background: transparent;
     color: var(--viewer-muted);
     font: inherit;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
   }
@@ -703,11 +703,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 8px 8px 8px 12px;
+    padding: 7px 7px 7px 10px;
     border: 1px solid var(--anno-accent);
     border-radius: 8px;
     background: var(--anno-tint);
-    font-size: 13px;
+    font-size: 12.5px;
     line-height: 1.35;
   }
 
@@ -742,7 +742,7 @@
 
   .anno-target__meta {
     color: var(--viewer-muted);
-    font-size: 12px;
+    font-size: 11.5px;
     font-variant-numeric: tabular-nums;
   }
 
@@ -756,25 +756,25 @@
   .anno-region__draw,
   .anno-region__icon {
     flex-shrink: 0;
-    height: 30px;
+    height: 28px;
     border: 1px solid var(--anno-accent);
     border-radius: 6px;
     background: var(--anno-raised);
     color: var(--anno-accent);
     font: inherit;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
   }
 
   .anno-region__draw {
-    padding: 0 9px;
+    padding: 0 8px;
   }
 
   .anno-region__icon {
     display: grid;
     place-items: center;
-    width: 30px;
+    width: 28px;
     border-color: transparent;
     background: transparent;
     color: var(--viewer-muted);
@@ -796,7 +796,7 @@
   .anno-intents {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    gap: 6px;
   }
 
   .anno-intents button {
@@ -804,14 +804,14 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    min-height: 72px;
-    border: 2px solid var(--viewer-panel-border);
-    border-radius: 8px;
+    gap: 4px;
+    min-height: 58px;
+    border: 1.5px solid var(--viewer-panel-border);
+    border-radius: 7px;
     background: var(--anno-raised);
     color: var(--viewer-text);
     font: inherit;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
   }
@@ -823,53 +823,53 @@
   }
 
   .anno-hint {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-radius: 6px;
     background: var(--anno-tint);
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.45;
   }
 
   :global(.anno-input) {
     box-sizing: border-box;
     width: 100%;
-    min-height: 44px;
-    padding: 0 12px;
+    min-height: 36px;
+    padding: 0 10px;
     border: 1px solid var(--anno-input-border);
     border-radius: 6px;
     background: var(--anno-raised);
     color: var(--viewer-text);
     font: inherit;
-    font-size: 15px;
+    font-size: 13.5px;
     font-weight: 400;
   }
 
   textarea:global(.anno-input) {
-    padding: 10px 12px;
+    padding: 8px 10px;
     resize: vertical;
   }
 
   .anno-times {
     display: flex;
-    gap: 12px;
+    gap: 10px;
   }
 
   .anno-times label {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 6px;
-    font-size: 13px;
+    gap: 5px;
+    font-size: 12px;
     font-weight: 600;
   }
 
   .anno-primary,
   .anno-secondary {
-    height: 44px;
-    padding: 0 20px;
+    height: 36px;
+    padding: 0 16px;
     border-radius: 6px;
     font: inherit;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
   }
@@ -881,25 +881,25 @@
   }
 
   .anno-secondary {
-    height: 40px;
-    padding: 0 14px;
+    height: 34px;
+    padding: 0 12px;
     border: 1px solid var(--anno-accent);
     background: transparent;
     color: var(--anno-accent);
-    font-size: 14px;
+    font-size: 12.5px;
   }
 
   :global(.anno-subtle) {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
+    padding: 3px 6px;
     border: 0;
     border-radius: 6px;
     background: transparent;
     color: var(--anno-accent);
     font: inherit;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
   }
@@ -912,13 +912,13 @@
   :global(.anno-muted) {
     margin: 0;
     color: var(--viewer-muted);
-    font-size: 13px;
+    font-size: 12px;
   }
 
   :global(.anno-error) {
     margin: 0;
     color: var(--viewer-danger);
-    font-size: 14px;
+    font-size: 12.5px;
   }
 
   :global(.anno-ai-flag) {
@@ -966,18 +966,18 @@
   }
 
   .anno-cards h3 {
-    font-size: 15px;
+    font-size: 13.5px;
   }
 
   .anno-card {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 12px;
+    padding: 10px;
     border: 1px solid var(--viewer-panel-border);
     border-radius: 8px;
     background: var(--anno-raised);
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .anno-card.selected {
