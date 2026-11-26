@@ -122,7 +122,7 @@
           ontoolchange(entry.id);
         }}
       >
-        <entry.icon size={18} aria-hidden="true" />
+        <entry.icon size={16} aria-hidden="true" />
       </button>
     {/each}
     <span class="anno-sep" aria-hidden="true"></span>
@@ -143,7 +143,7 @@
         }
       }}
     >
-      <Sparkles size={18} aria-hidden="true" />
+      <Sparkles size={16} aria-hidden="true" />
     </button>
     {#if gallery !== undefined}
       <span class="anno-sep" aria-hidden="true"></span>
@@ -156,7 +156,7 @@
         title={gallery ? $t('annotate.gallery.hide') : $t('annotate.gallery.show')}
         onclick={() => ongallerytoggle?.()}
       >
-        <GalleryHorizontal size={18} aria-hidden="true" />
+        <GalleryHorizontal size={16} aria-hidden="true" />
       </button>
     {/if}
   </div>
@@ -335,10 +335,10 @@
   .anno-tool {
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border: 0;
-    border-radius: 7px;
+    border-radius: 6px;
     background: transparent;
     color: inherit;
     cursor: pointer;
@@ -361,11 +361,11 @@
   }
 
   .anno-smart {
-    width: 260px;
+    width: 240px;
     max-height: 100%;
     overflow-y: auto;
     padding: 8px;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .anno-smart__header {
@@ -388,8 +388,8 @@
   .anno-icon-btn {
     display: grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border: 0;
     border-radius: 6px;
     background: transparent;
@@ -402,7 +402,7 @@
     align-items: center;
     gap: 8px;
     width: 100%;
-    padding: 8px 6px;
+    padding: 7px 6px;
     border: 0;
     border-top: 1px solid var(--viewer-panel-border);
     background: transparent;
@@ -422,7 +422,7 @@
   }
 
   .anno-smart__content {
-    padding: 4px 6px 10px;
+    padding: 4px 6px 8px;
   }
 
   .anno-smart__content p {
@@ -433,17 +433,17 @@
   .anno-smart__explain {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
 
   .anno-smart__toggle {
     display: grid;
     flex-shrink: 0;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
     border: 1px solid var(--viewer-panel-border);
-    border-radius: 8px;
+    border-radius: 6px;
     background: transparent;
     color: inherit;
     cursor: pointer;
@@ -457,7 +457,7 @@
 
   .anno-smart__modes {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     margin: 6px 0;
   }
 
@@ -466,7 +466,7 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .anno-smart__actions {
@@ -476,7 +476,7 @@
 
   .anno-smart__actions button {
     flex: 1;
-    height: 32px;
+    height: 28px;
     border: 1px solid var(--viewer-panel-border);
     border-radius: 6px;
     background: transparent;
@@ -492,7 +492,7 @@
 
   .anno-hint {
     color: var(--viewer-muted);
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .anno-error {
@@ -538,7 +538,7 @@
     }
 
     .anno-smart {
-      width: min(260px, 100%);
+      width: min(240px, 100%);
     }
   }
 </style>
