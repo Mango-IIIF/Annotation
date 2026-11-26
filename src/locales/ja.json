@@ -1,19 +1,5 @@
 {
-  "about": {
-    "description": "Mango is an open-source, W3C Annotation and IIIF-compliant deep zoom viewer and interactive story creation suite designed for high-resolution manuscript, artwork, and spatial media exploration."
-  },
   "annotate": {
-    "stage": "注釈ステージ",
-    "loading": "資料を読み込んでいます…",
-    "loadError": "資料を読み込めませんでした。",
-    "warnings": {
-      "invalidConfig": "注釈エディターの設定が無効です:"
-    },
-    "export": {
-      "button": "注釈をダウンロード ({count})",
-      "ready": "公開可能な IIIF をダウンロードしました。",
-      "draft": "下書きをダウンロードしました。公開前にページと注釈に HTTP(S) の ID を割り当ててください。"
-    },
     "sidebar": {
       "label": "注釈",
       "editing": "注釈を編集中",
@@ -25,9 +11,6 @@
       "json": "保存される内容"
     },
     "scope": {
-      "label": "何についての注釈ですか？",
-      "region": "範囲",
-      "canvas": "この画像",
       "wholeImageAction": "画像全体に注釈を付ける",
       "switchToArea": "範囲に変更",
       "short": {
@@ -40,10 +23,8 @@
     "region": {
       "start": "画像上に描いて範囲を注釈するか、既存の図形をクリックしてください。",
       "none": "画像上に枠を描くか、図形をクリックしてください。",
-      "drawing": "画像をクリックして開始し、もう一度クリックして終了します。",
       "drawingShort": "画像上に描画中…",
       "cancelDraw": "キャンセル",
-      "selected": "選択した範囲: {w} × {h} px",
       "selectedTitle": "選択した範囲",
       "dimensions": "{w} × {h} px",
       "count": "この範囲に {count} 件",
@@ -60,7 +41,6 @@
     },
     "intents": {
       "question": "何をしますか？",
-      "choose": "上の選択肢を選ぶと必要な欄が表示されます。",
       "note": {
         "label": "メモを追加",
         "hint": {
@@ -133,41 +113,8 @@
       "none": "参照先が設定されていません。"
     },
     "ai": {
-      "label": "AI の提案",
       "flag": "AI",
-      "loading": "画像を確認しています…",
-      "suggest": {
-        "region": "AI で提案 (この範囲)",
-        "image": "AI で提案 (画像全体)"
-      },
-      "explain": {
-        "region": "この範囲を送信して提案を受け取ります。提案はフォームに入力されるだけなので、保存前に確認してください。",
-        "image": "この画像を送信して提案を受け取ります。提案はフォームに入力されるだけなので、保存前に確認してください。"
-      },
-      "fields": {
-        "label": "タイトル",
-        "note": "説明",
-        "transcription": "書き起こし",
-        "tags": "キーワード"
-      },
-      "inForm": "入力済み",
-      "use": "使う",
-      "link": "リンク",
-      "linked": "リンク済み",
       "suggestedBy": "{model} による提案"
-    },
-    "problems": {
-      "noIntent": "何をするか選んでください。",
-      "noText": "保存する前に何か入力してください。",
-      "noTags": "キーワードを 1 つ以上追加してください。",
-      "noEntity": "誰・何・どこなのかを選んでください。",
-      "badUrl": "http:// または https:// で始まるアドレスを入力してください。",
-      "noRegion": "先に画像上で図形を描くか選択するか、画像全体に注釈を付けてください。",
-      "time": {
-        "start": "開始時間は 0 秒以上で入力してください。",
-        "startAfterEnd": "開始時間は録音の終わりより前にしてください。",
-        "end": "終了時間は開始より後で、録音の長さ以内にしてください。"
-      }
     },
     "cards": {
       "heading": "あなたの注釈 ({count})",
@@ -180,45 +127,9 @@
       "edit": "編集",
       "delete": "削除"
     },
-    "table": {
-      "heading": "すべての注釈 ({count})",
-      "show": "注釈一覧を表示",
-      "hide": "注釈一覧を隠す",
-      "search": "注釈を検索",
-      "filter": "出典で絞り込み",
-      "sortBy": "並べ替え",
-      "origin": {
-        "all": "すべて",
-        "mine": "あなたの注釈",
-        "source": "資料の注釈"
-      },
-      "sort": {
-        "document": "文書順",
-        "title": "タイトル",
-        "motivation": "種類",
-        "where": "場所"
-      },
-      "columns": {
-        "title": "タイトル",
-        "text": "テキスト",
-        "motivation": "種類",
-        "where": "場所",
-        "origin": "出典"
-      },
-      "select": "{annotation} を選択",
-      "count": "{total} 件中 {shown} 件を表示",
-      "canvasN": "画像 {n}"
-    },
     "gallery": {
-      "label": "ページ",
       "show": "ページを表示",
-      "hide": "ページを隠す",
-      "page": "ページ {n}: {label}",
-      "annotated": "あなたの注釈があります"
-    },
-    "settings": {
-      "label": "設定",
-      "colour": "ビューアーの色"
+      "hide": "ページを隠す"
     },
     "tools": {
       "label": "描画ツール",
@@ -257,23 +168,6 @@
       "paused": "選択を一時停止中です。画像をドラッグして移動できます。",
       "done": "完了",
       "reset": "リセット"
-    },
-    "av": {
-      "recording": "録音",
-      "recordingN": "録音 {n}",
-      "recordingKind": "オーラルヒストリー",
-      "position": "再生位置",
-      "loadError": "録音を読み込めませんでした。配信元のサーバーが利用できない可能性があります。時間は手動で入力できます。",
-      "details": "録音の詳細",
-      "tabs": {
-        "transcript": "書き起こし",
-        "chapters": "チャプター",
-        "annotations": "注釈"
-      },
-      "findInTranscript": "書き起こしを検索",
-      "noTranscript": "書き起こしが見つかりません。",
-      "noChapters": "チャプターはありません。",
-      "noAnnotations": "資料の注釈はありません。"
     }
   }
 }

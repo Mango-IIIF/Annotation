@@ -1,19 +1,5 @@
 {
-  "about": {
-    "description": "Mango est un visualiseur à zoom profond open source, conforme à IIIF et à W3C Annotation, doublé d'une suite de création d'histoires interactives, conçu pour explorer manuscrits, œuvres d'art et médias spatiaux en haute résolution."
-  },
   "annotate": {
-    "stage": "Zone d'annotation",
-    "loading": "Chargement de l'élément…",
-    "loadError": "L'élément n'a pas pu être chargé.",
-    "warnings": {
-      "invalidConfig": "Configuration de l'éditeur d'annotations non valide :"
-    },
-    "export": {
-      "button": "Télécharger les annotations ({count})",
-      "ready": "IIIF prêt à publier téléchargé.",
-      "draft": "Brouillon téléchargé. Attribuez des identifiants HTTP(S) à la page et aux annotations avant publication."
-    },
     "sidebar": {
       "label": "Annoter",
       "editing": "Modification de l'annotation",
@@ -25,9 +11,6 @@
       "json": "Ce qui est enregistré"
     },
     "scope": {
-      "label": "De quoi s'agit-il ?",
-      "region": "Une zone",
-      "canvas": "Cette image",
       "wholeImageAction": "Annoter toute l'image",
       "switchToArea": "Passer à une zone",
       "short": {
@@ -40,10 +23,8 @@
     "region": {
       "start": "Dessinez sur l'image pour annoter une zone ou cliquez sur une forme existante.",
       "none": "Dessinez un cadre sur l'image, ou cliquez sur une forme.",
-      "drawing": "Cliquez sur l'image pour commencer, puis à nouveau pour terminer.",
       "drawingShort": "Dessin sur l'image…",
       "cancelDraw": "Annuler",
-      "selected": "Zone sélectionnée, {w} × {h} px",
       "selectedTitle": "Zone sélectionnée",
       "dimensions": "{w} × {h} px",
       "count": "{count} sur cette zone",
@@ -60,7 +41,6 @@
     },
     "intents": {
       "question": "Que souhaitez-vous faire ?",
-      "choose": "Choisissez une option ci-dessus pour voir les champs nécessaires.",
       "note": {
         "label": "Ajouter une note",
         "hint": {
@@ -133,41 +113,8 @@
       "none": "Aucune source de référence n'est configurée."
     },
     "ai": {
-      "label": "Suggestions de l'IA",
       "flag": "IA",
-      "loading": "Analyse de l'image…",
-      "suggest": {
-        "region": "Suggérer avec l'IA (cette zone)",
-        "image": "Suggérer avec l'IA (image entière)"
-      },
-      "explain": {
-        "region": "Envoie cette zone pour obtenir des suggestions. Elles remplissent seulement le formulaire ; vérifiez-les avant d'enregistrer.",
-        "image": "Envoie cette image pour obtenir des suggestions. Elles remplissent seulement le formulaire ; vérifiez-les avant d'enregistrer."
-      },
-      "fields": {
-        "label": "Titre",
-        "note": "Description",
-        "transcription": "Transcription",
-        "tags": "Mots-clés"
-      },
-      "inForm": "Dans le formulaire",
-      "use": "Utiliser",
-      "link": "Lier",
-      "linked": "Lié",
       "suggestedBy": "Suggéré par {model}"
-    },
-    "problems": {
-      "noIntent": "Choisissez ce que vous souhaitez faire.",
-      "noText": "Écrivez quelque chose avant d'enregistrer.",
-      "noTags": "Ajoutez au moins un mot-clé.",
-      "noEntity": "Choisissez qui, quoi ou où c'est.",
-      "badUrl": "Saisissez une adresse web commençant par http:// ou https://.",
-      "noRegion": "Dessinez ou sélectionnez d'abord une forme sur l'image, ou annotez l'image entière.",
-      "time": {
-        "start": "Saisissez un temps de début de zéro seconde ou plus.",
-        "startAfterEnd": "Le début doit précéder la fin de l'enregistrement.",
-        "end": "La fin doit suivre le début et rester dans l'enregistrement."
-      }
     },
     "cards": {
       "heading": "Vos annotations ({count})",
@@ -180,45 +127,9 @@
       "edit": "Modifier",
       "delete": "Supprimer"
     },
-    "table": {
-      "heading": "Toutes les annotations ({count})",
-      "show": "Afficher la liste des annotations",
-      "hide": "Masquer la liste des annotations",
-      "search": "Rechercher des annotations",
-      "filter": "Filtrer par origine",
-      "sortBy": "Trier par",
-      "origin": {
-        "all": "Toutes",
-        "mine": "Les vôtres",
-        "source": "De l'élément"
-      },
-      "sort": {
-        "document": "Ordre du document",
-        "title": "Titre",
-        "motivation": "Type",
-        "where": "Emplacement"
-      },
-      "columns": {
-        "title": "Titre",
-        "text": "Texte",
-        "motivation": "Type",
-        "where": "Emplacement",
-        "origin": "Origine"
-      },
-      "select": "Sélectionner {annotation}",
-      "count": "{shown} sur {total} affichées",
-      "canvasN": "Image {n}"
-    },
     "gallery": {
-      "label": "Pages",
       "show": "Afficher les pages",
-      "hide": "Masquer les pages",
-      "page": "Page {n} : {label}",
-      "annotated": "Contient vos annotations"
-    },
-    "settings": {
-      "label": "Paramètres",
-      "colour": "Couleur de la visionneuse"
+      "hide": "Masquer les pages"
     },
     "tools": {
       "label": "Outils de dessin",
@@ -257,23 +168,6 @@
       "paused": "Sélection en pause. Faites glisser l'image pour la déplacer.",
       "done": "Terminer",
       "reset": "Réinitialiser"
-    },
-    "av": {
-      "recording": "Enregistrement",
-      "recordingN": "Enregistrement {n}",
-      "recordingKind": "Histoire orale",
-      "position": "Position de lecture",
-      "loadError": "L'enregistrement n'a pas pu être chargé. Le serveur source est peut-être indisponible. Vous pouvez toujours saisir les temps à la main.",
-      "details": "Détails de l'enregistrement",
-      "tabs": {
-        "transcript": "Transcription",
-        "chapters": "Chapitres",
-        "annotations": "Annotations"
-      },
-      "findInTranscript": "Rechercher dans la transcription",
-      "noTranscript": "Aucun passage de transcription.",
-      "noChapters": "Aucun chapitre disponible.",
-      "noAnnotations": "Aucune annotation de l'élément."
     }
   }
 }

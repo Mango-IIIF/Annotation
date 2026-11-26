@@ -51,6 +51,7 @@ export {
   metadataOf,
   type MediaKind,
 } from './annotations/iiif';
+export { normaliseAuthoringLanguages } from './annotations/languages';
 export {
   annotationPage,
   annotationText,
@@ -114,7 +115,14 @@ export {
   wikidata,
   wikidataLabels,
 } from './authorities/wikidata';
-export { getLocale, locale, setLocale, translate } from './core/i18n';
+export {
+  clearLocaleOverrides,
+  getLocale,
+  locale,
+  setLocale,
+  setLocaleOverrides,
+  translate,
+} from './core/i18n';
 export type {
   ImageAnnotation,
   OpenSeadragonAnnotator,

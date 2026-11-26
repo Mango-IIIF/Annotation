@@ -1,19 +1,5 @@
 {
-  "about": {
-    "description": "Mae Mango yn wyliwr chwyddo dwfn cod agored sy'n cydymffurfio â W3C Annotation a IIIF, ynghyd â chyfres creu storïau rhyngweithiol, wedi'i gynllunio i archwilio llawysgrifau, gwaith celf a chyfryngau gofodol cydraniad uchel."
-  },
   "annotate": {
-    "stage": "Llwyfan anodi",
-    "loading": "Wrthi'n llwytho'r eitem…",
-    "loadError": "Nid oedd modd llwytho'r eitem.",
-    "warnings": {
-      "invalidConfig": "Ffurfweddiad golygydd anodi annilys:"
-    },
-    "export": {
-      "button": "Lawrlwytho anodiadau ({count})",
-      "ready": "Wedi lawrlwytho IIIF sy'n barod i'w gyhoeddi.",
-      "draft": "Wedi lawrlwytho drafft. Rhowch ddynodwyr HTTP(S) i'r dudalen a'r anodiadau cyn cyhoeddi."
-    },
     "sidebar": {
       "label": "Anodi",
       "editing": "Wrthi'n golygu anodiad",
@@ -25,9 +11,6 @@
       "json": "Beth sy'n cael ei gadw"
     },
     "scope": {
-      "label": "Am beth mae o?",
-      "region": "Ardal",
-      "canvas": "Y ddelwedd hon",
       "wholeImageAction": "Anodi'r ddelwedd gyfan",
       "switchToArea": "Newid i ardal",
       "short": {
@@ -40,10 +23,8 @@
     "region": {
       "start": "Tynnwch ar y ddelwedd i anodi ardal, neu cliciwch siâp presennol.",
       "none": "Tynnwch flwch ar y ddelwedd, neu cliciwch siâp.",
-      "drawing": "Cliciwch ar y ddelwedd i ddechrau, ac eto i orffen.",
       "drawingShort": "Wrthi'n tynnu ar y ddelwedd…",
       "cancelDraw": "Canslo",
-      "selected": "Ardal wedi'i dewis, {w} × {h} px",
       "selectedTitle": "Ardal wedi'i dewis",
       "dimensions": "{w} × {h} px",
       "count": "{count} ar yr ardal hon",
@@ -60,7 +41,6 @@
     },
     "intents": {
       "question": "Beth hoffech chi ei wneud?",
-      "choose": "Dewiswch opsiwn uchod i weld y blychau sydd eu hangen.",
       "note": {
         "label": "Ychwanegu nodyn",
         "hint": {
@@ -133,41 +113,8 @@
       "none": "Nid oes ffynonellau cyfeirio wedi'u ffurfweddu."
     },
     "ai": {
-      "label": "Awgrymiadau AI",
       "flag": "AI",
-      "loading": "Wrthi'n edrych ar y ddelwedd…",
-      "suggest": {
-        "region": "Awgrymu gydag AI (yr ardal hon)",
-        "image": "Awgrymu gydag AI (y ddelwedd gyfan)"
-      },
-      "explain": {
-        "region": "Yn anfon yr ardal hon am awgrymiadau. Dim ond llenwi'r ffurflen maen nhw; gwiriwch nhw cyn cadw.",
-        "image": "Yn anfon y ddelwedd hon am awgrymiadau. Dim ond llenwi'r ffurflen maen nhw; gwiriwch nhw cyn cadw."
-      },
-      "fields": {
-        "label": "Teitl",
-        "note": "Disgrifiad",
-        "transcription": "Trawsgrifiad",
-        "tags": "Geiriau allweddol"
-      },
-      "inForm": "Yn y ffurflen",
-      "use": "Defnyddio",
-      "link": "Cysylltu",
-      "linked": "Wedi'i gysylltu",
       "suggestedBy": "Awgrymwyd gan {model}"
-    },
-    "problems": {
-      "noIntent": "Dewiswch beth hoffech ei wneud.",
-      "noText": "Ysgrifennwch rywbeth cyn cadw.",
-      "noTags": "Ychwanegwch o leiaf un gair allweddol.",
-      "noEntity": "Dewiswch pwy, beth neu ble yw hyn.",
-      "badUrl": "Rhowch gyfeiriad gwe sy'n dechrau gyda http:// neu https://.",
-      "noRegion": "Tynnwch neu dewiswch siâp ar y ddelwedd yn gyntaf, neu anodwch y ddelwedd gyfan.",
-      "time": {
-        "start": "Rhowch amser dechrau o sero eiliad neu fwy.",
-        "startAfterEnd": "Rhaid i'r amser dechrau fod cyn diwedd y recordiad.",
-        "end": "Rhaid i'r amser diwedd fod ar ôl y dechrau ac o fewn y recordiad."
-      }
     },
     "cards": {
       "heading": "Eich anodiadau ({count})",
@@ -180,45 +127,9 @@
       "edit": "Golygu",
       "delete": "Dileu"
     },
-    "table": {
-      "heading": "Pob anodiad ({count})",
-      "show": "Dangos rhestr anodiadau",
-      "hide": "Cuddio rhestr anodiadau",
-      "search": "Chwilio anodiadau",
-      "filter": "Hidlo yn ôl tarddiad",
-      "sortBy": "Trefnu yn ôl",
-      "origin": {
-        "all": "Pob un",
-        "mine": "Eich rhai chi",
-        "source": "O'r eitem"
-      },
-      "sort": {
-        "document": "Trefn y ddogfen",
-        "title": "Teitl",
-        "motivation": "Math",
-        "where": "Lle"
-      },
-      "columns": {
-        "title": "Teitl",
-        "text": "Testun",
-        "motivation": "Math",
-        "where": "Lle",
-        "origin": "O"
-      },
-      "select": "Dewis {annotation}",
-      "count": "Yn dangos {shown} o {total}",
-      "canvasN": "Delwedd {n}"
-    },
     "gallery": {
-      "label": "Tudalennau",
       "show": "Dangos tudalennau",
-      "hide": "Cuddio tudalennau",
-      "page": "Tudalen {n}: {label}",
-      "annotated": "Mae eich anodiadau arni"
-    },
-    "settings": {
-      "label": "Gosodiadau",
-      "colour": "Lliw y gwyliwr"
+      "hide": "Cuddio tudalennau"
     },
     "tools": {
       "label": "Offer tynnu",
@@ -257,23 +168,6 @@
       "paused": "Dewis wedi'i oedi. Llusgwch y ddelwedd i'w symud.",
       "done": "Gorffen",
       "reset": "Ailosod"
-    },
-    "av": {
-      "recording": "Recordiad",
-      "recordingN": "Recordiad {n}",
-      "recordingKind": "Hanes llafar",
-      "position": "Safle chwarae",
-      "loadError": "Nid oedd modd llwytho'r recordiad. Efallai nad yw'r gweinydd ffynhonnell ar gael. Gallwch roi amseroedd â llaw o hyd.",
-      "details": "Manylion y recordiad",
-      "tabs": {
-        "transcript": "Trawsgrifiad",
-        "chapters": "Penodau",
-        "annotations": "Anodiadau"
-      },
-      "findInTranscript": "Chwilio yn y trawsgrifiad",
-      "noTranscript": "Dim darnau trawsgrifiad.",
-      "noChapters": "Dim penodau ar gael.",
-      "noAnnotations": "Dim anodiadau o'r eitem."
     }
   }
 }

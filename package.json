@@ -1,6 +1,6 @@
 {
   "name": "@mango-iiif/annotation",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Framework-agnostic OpenSeadragon annotation editor.",
   "license": "MIT",
   "repository": {
@@ -31,6 +31,10 @@
     "./model": {
       "import": "./dist/model.js",
       "types": "./dist/model.d.ts"
+    },
+    "./i18n": {
+      "import": "./dist/i18n.js",
+      "types": "./dist/core/i18n.d.ts"
     },
     "./style.css": "./dist/annotation.css",
     "./view.css": "./dist/view.css",

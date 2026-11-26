@@ -1,19 +1,5 @@
 {
-  "about": {
-    "description": "Mango is an open-source, W3C Annotation and IIIF-compliant deep zoom viewer and interactive story creation suite designed for high-resolution manuscript, artwork, and spatial media exploration."
-  },
   "annotate": {
-    "stage": "Annotation stage",
-    "loading": "Loading the item…",
-    "loadError": "The item could not be loaded.",
-    "warnings": {
-      "invalidConfig": "Invalid annotation editor config:"
-    },
-    "export": {
-      "button": "Download annotations ({count})",
-      "ready": "Publication-ready IIIF downloaded.",
-      "draft": "Draft downloaded. Assign HTTP(S) page and annotation IDs before publication."
-    },
     "sidebar": {
       "label": "Annotate",
       "editing": "Editing annotation",
@@ -25,9 +11,6 @@
       "json": "What gets saved"
     },
     "scope": {
-      "label": "What is it about?",
-      "region": "An area",
-      "canvas": "This image",
       "wholeImageAction": "Annotate whole image",
       "switchToArea": "Switch to an area",
       "short": {
@@ -40,10 +23,8 @@
     "region": {
       "start": "Draw on the image to annotate an area, or click an existing shape.",
       "none": "Draw a box on the image, or click a shape.",
-      "drawing": "Click on the image to start, and again to finish.",
       "drawingShort": "Drawing on the image…",
       "cancelDraw": "Cancel",
-      "selected": "Area selected, {w} × {h} px",
       "selectedTitle": "Area selected",
       "dimensions": "{w} × {h} px",
       "count": "{count} on this area",
@@ -60,7 +41,6 @@
     },
     "intents": {
       "question": "What would you like to do?",
-      "choose": "Choose an option above to see the boxes you need.",
       "note": {
         "label": "Add a note",
         "hint": {
@@ -133,41 +113,8 @@
       "none": "No reference sources are configured."
     },
     "ai": {
-      "label": "AI suggestions",
       "flag": "AI",
-      "loading": "Looking at the image…",
-      "suggest": {
-        "region": "Suggest with AI (this area)",
-        "image": "Suggest with AI (whole image)"
-      },
-      "explain": {
-        "region": "Sends this area for suggestions. They only fill the form; check them before saving.",
-        "image": "Sends this image for suggestions. They only fill the form; check them before saving."
-      },
-      "fields": {
-        "label": "Title",
-        "note": "Description",
-        "transcription": "Transcription",
-        "tags": "Keywords"
-      },
-      "inForm": "In the form",
-      "use": "Use",
-      "link": "Link",
-      "linked": "Linked",
       "suggestedBy": "Suggested by {model}"
-    },
-    "problems": {
-      "noIntent": "Choose what you would like to do.",
-      "noText": "Write something before saving.",
-      "noTags": "Add at least one keyword.",
-      "noEntity": "Choose who, what or where this is.",
-      "badUrl": "Enter a web address starting with http:// or https://.",
-      "noRegion": "Draw or select a shape on the image first, or annotate the whole image.",
-      "time": {
-        "start": "Enter a start time of zero or more seconds.",
-        "startAfterEnd": "The start time must be before the recording ends.",
-        "end": "The end time must be after the start and within the recording."
-      }
     },
     "cards": {
       "heading": "Your annotations ({count})",
@@ -180,45 +127,9 @@
       "edit": "Edit",
       "delete": "Delete"
     },
-    "table": {
-      "heading": "All annotations ({count})",
-      "show": "Show annotation list",
-      "hide": "Hide annotation list",
-      "search": "Search annotations",
-      "filter": "Filter by origin",
-      "sortBy": "Sort by",
-      "origin": {
-        "all": "All",
-        "mine": "Yours",
-        "source": "From the item"
-      },
-      "sort": {
-        "document": "Document order",
-        "title": "Title",
-        "motivation": "Type",
-        "where": "Where"
-      },
-      "columns": {
-        "title": "Title",
-        "text": "Text",
-        "motivation": "Type",
-        "where": "Where",
-        "origin": "From"
-      },
-      "select": "Select {annotation}",
-      "count": "Showing {shown} of {total}",
-      "canvasN": "Image {n}"
-    },
     "gallery": {
-      "label": "Pages",
       "show": "Show pages",
-      "hide": "Hide pages",
-      "page": "Page {n}: {label}",
-      "annotated": "Has your annotations"
-    },
-    "settings": {
-      "label": "Settings",
-      "colour": "Viewer colour"
+      "hide": "Hide pages"
     },
     "tools": {
       "label": "Drawing tools",
@@ -257,23 +168,6 @@
       "paused": "Selection paused. Drag the image to move.",
       "done": "Done",
       "reset": "Reset"
-    },
-    "av": {
-      "recording": "Recording",
-      "recordingN": "Recording {n}",
-      "recordingKind": "Oral history",
-      "position": "Playback position",
-      "loadError": "The recording could not be loaded. The source server may be unavailable. You can still enter times by hand.",
-      "details": "Recording details",
-      "tabs": {
-        "transcript": "Transcript",
-        "chapters": "Chapters",
-        "annotations": "Annotations"
-      },
-      "findInTranscript": "Find in transcript",
-      "noTranscript": "No transcript passages found.",
-      "noChapters": "No chapters available.",
-      "noAnnotations": "No annotations from the item."
     }
   }
 }

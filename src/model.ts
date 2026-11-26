@@ -39,6 +39,7 @@ export {
   metadataOf,
   type MediaKind,
 } from './annotations/iiif';
+export { normaliseAuthoringLanguages } from './annotations/languages';
 export {
   annotationPage,
   annotationText,

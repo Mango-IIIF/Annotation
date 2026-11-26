@@ -27,6 +27,7 @@ export default defineConfig(() => {
           index: 'src/index.ts',
           view: 'src/view/index.ts',
           model: 'src/model.ts',
+          i18n: 'src/core/i18n.ts',
         },
         formats: ['es'],
       },
